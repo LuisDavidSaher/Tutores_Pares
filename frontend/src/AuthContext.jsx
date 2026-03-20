@@ -1,46 +1,90 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 
-// 1. Creamos el contexto (la caja fuerte)
 export const AuthContext = createContext();
 
-// 2. Creamos el "Proveedor", que es el componente que envolverá nuestra aplicación
 export const AuthProvider = ({ children }) => {
-  // Estado para guardar la información del usuario
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Función para iniciar sesión con los roles reales del proyecto
-  const login = (email, password) => {
-    
-    // 1. Administrador del Sistema / Desarrollador
-    if (email === "admin@unicartagena.edu.co" && password === "123456") {
-      setUser({ email, role: 'Administrador del Sistema', name: 'Equipo de Desarrollo' });
-      return true;
-    } 
-    // 2. Jefe de Departamento Académico
-    else if (email === "jefe@unicartagena.edu.co" && password === "123456") {
-      setUser({ email, role: 'Jefe de Departamento Académico', name: 'Dr. Carlos Mendoza' });
-      return true;
-    } 
-    // 3. Centro de Bienestar Estudiantil y Laboral
-    else if (email === "bienestar@unicartagena.edu.co" && password === "123456") {
-      setUser({ email, role: 'Centro de Bienestar', name: 'Dra. Ana Gómez' });
-      return true;
-    } 
-    // Credenciales incorrectas
-    else {
-      alert("Credenciales incorrectas. Prueba con admin@, jefe@ o bienestar@ (clave: 123456)");
-      return false;
+  const cargarDatosUsuario = async (email) => {
+    try {
+      const { data, error } = await supabase
+        .from('roles_usuarios')
+        .select('rol')
+        .eq('correo', email)
+        .single();
+
+      if (error) throw error;
+
+      const nombreFormateado = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      setUser({
+        name: nombreFormateado,
+        email: email,
+        role: data.rol
+      });
+    } catch (error) {
+      console.error("Error al cargar el rol:", error.message);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Función para cerrar sesión
-  const logout = () => {
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await cargarDatosUsuario(session.user.email);
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        cargarDatosUsuario(session.user.email);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const login = async (email, password) => {
+    try {
+      // CORRECCIÓN: Quitamos 'data' para evitar el error de variable sin usar
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      await cargarDatosUsuario(email);
+      return { success: true };
+
+    } catch (error) {
+      console.error("Error de Login:", error.message);
+      return { success: false, message: "Credenciales incorrectas o usuario no registrado." };
+    }
+  };
+
+  const logout = async () => {
+    setLoading(true);
+    await supabase.auth.signOut();
     setUser(null);
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

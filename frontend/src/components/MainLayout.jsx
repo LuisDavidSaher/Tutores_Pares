@@ -3,28 +3,42 @@ import { AuthContext } from '../AuthContext';
 import logoCorto from '../assets/Logo_Corto.png';
 import logoUdc from '../assets/Logo_Completo.png';
 
-import GestionDatos from './GestionDatos.jsx';
-import Certificados from './Certificados.jsx';
-import Dashboard from './Dashboard.jsx';
-import Reportes from './Reportes.jsx';
-import Auditorias from './Auditorias.jsx';
+// Importación de todos los módulos del reino
 import Inicio from './Inicio.jsx';
 import GestionUsuarios from './GestionUsuarios.jsx';
+import GestionDatos from './GestionDatos.jsx';
+import Asignaturas from './Asignaturas.jsx'; // <-- EL NUEVO MÓDULO
+import Reportes from './Reportes.jsx';
+import Dashboard from './Dashboard.jsx';
+import Auditorias from './Auditorias.jsx';
 
 const MainLayout = () => {
   const { user, logout } = useContext(AuthContext);
   const [activeMenu, setActiveMenu] = useState('Inicio');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const menuOptions = [
-    'Inicio',
-    'Gestión de Usuarios',
-    'Gestión de Tutores y Tutorados',
-    'Reportes',
-    'Dashboard Estadísticas',
-    'Auditorías',
-    'Certificados'
-  ];
+  // --- LÓGICA DE CONTROL DE ACCESO (RBAC) ---
+  let menuOptions = [];
+
+  if (user?.role === 'Administrador') {
+    // El Administrador ve todo el reino (Certificados retirado por orden de UX)
+    menuOptions = [
+      'Inicio',
+      'Gestión de Usuarios',
+      'Gestión de Datos',
+      'Asignaturas',
+      'Reportes',
+      'Dashboard Estadísticas',
+      'Auditorías'
+    ];
+  } else {
+    // El Jefe de Departamento tiene visión restringida
+    menuOptions = [
+      'Inicio',
+      'Dashboard Estadísticas',
+      'Reportes'
+    ];
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -66,12 +80,12 @@ const MainLayout = () => {
         <div className={`p-4 border-t border-gray-700 bg-black/20 flex ${isSidebarOpen ? 'justify-between items-center' : 'flex-col justify-center space-y-4'}`}>
           <div className={`flex items-center overflow-hidden ${isSidebarOpen ? 'space-x-3' : 'justify-center'}`}>
             <div className="w-10 h-10 rounded-full bg-[#EBB700] text-[#1B2631] flex items-center justify-center font-bold text-lg shrink-0">
-              {user.name.charAt(0)}
+              {user?.name?.charAt(0) || 'U'}
             </div>
             {isSidebarOpen && (
               <div className="truncate">
-                <p className="text-sm font-semibold truncate">{user.name}</p>
-                <p className="text-xs text-gray-400 truncate">{user.role}</p>
+                <p className="text-sm font-semibold truncate">{user?.name}</p>
+                <p className="text-xs text-gray-400 truncate">{user?.role}</p>
               </div>
             )}
           </div>
@@ -109,23 +123,19 @@ const MainLayout = () => {
           </div>
         </header>
 
-        {/* Contenedor dinámico de vistas */}
+        {/* Contenedor dinámico de vistas con Seguridad de Rutas */}
         <div className="p-8 flex-1">
-          {activeMenu === 'Inicio' ? (
-            <Inicio setActiveMenu={setActiveMenu} />
-          ) : activeMenu === 'Gestión de Usuarios' ? (
-            <GestionUsuarios />
-          ) : activeMenu === 'Gestión de Tutores y Tutorados' ? (
-            <GestionDatos />
-          ) : activeMenu === 'Certificados' ? (
-            <Certificados />
-          ) : activeMenu === 'Dashboard Estadísticas' ? (
-            <Dashboard />
-          ) : activeMenu === 'Reportes' ? (
-            <Reportes />
-          ) : activeMenu === 'Auditorías' ? (
-            <Auditorias />
-          ) : null}
+          {activeMenu === 'Inicio' && <Inicio setActiveMenu={setActiveMenu} />}
+          
+          {/* Rutas Restringidas (Solo Administrador) */}
+          {user?.role === 'Administrador' && activeMenu === 'Gestión de Usuarios' && <GestionUsuarios />}
+          {user?.role === 'Administrador' && activeMenu === 'Gestión de Datos' && <GestionDatos />}
+          {user?.role === 'Administrador' && activeMenu === 'Asignaturas' && <Asignaturas />}
+          {user?.role === 'Administrador' && activeMenu === 'Auditorías' && <Auditorias />}
+          
+          {/* Rutas Compartidas (Admin y Jefe) */}
+          {activeMenu === 'Dashboard Estadísticas' && <Dashboard />}
+          {activeMenu === 'Reportes' && <Reportes />}
         </div>
 
         {/* --- FOOTER GLOBAL --- */}
@@ -145,41 +155,10 @@ const MainLayout = () => {
                   <li><a href="https://www.unicartagena.edu.co/" target="_blank" rel="noopener noreferrer" className="hover:text-[#1B2631] transition-colors">Portal Universidad de Cartagena</a></li>
                   <li><a href="#" className="hover:text-[#1B2631] transition-colors">Guía de Uso del Aplicativo</a></li>
                 </ul>
-                <h3 className="font-bold text-gray-800 mb-4 text-sm">Redes Sociales</h3>
-                <div className="flex space-x-3">
-                  
-                  {/* Facebook (SVG Seguro) */}
-                  <a href="#" className="w-8 h-8 rounded-full bg-yellow-50 text-[#EBB700] hover:bg-[#EBB700] hover:text-white transition-all flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"></path>
-                    </svg>
-                  </a>
-                  
-                  {/* Instagram (SVG Seguro) */}
-                  <a href="#" className="w-8 h-8 rounded-full bg-yellow-50 text-[#EBB700] hover:bg-[#EBB700] hover:text-white transition-all flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                      <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"></path>
-                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                    </svg>
-                  </a>
-                  
-                  {/* X / Twitter (SVG Seguro) */}
-                  <a href="#" className="w-8 h-8 rounded-full bg-yellow-50 text-[#EBB700] hover:bg-[#EBB700] hover:text-white transition-all flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"></path>
-                    </svg>
-                  </a>
-
-                </div>
               </div>
               
               <div>
                 <h3 className="font-bold text-gray-800 mb-4 text-sm">Contacto y Soporte</h3>
-                <p className="text-gray-500 text-sm mb-2 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  Email:
-                </p>
                 <ul className="text-[#EBB700] text-sm space-y-2 font-medium">
                   <li><a href="mailto:soporte@unicartagena.edu.co" className="hover:underline hover:text-yellow-600 transition-colors">soporte@unicartagena.edu.co</a></li>
                   <li><a href="mailto:bienestar@unicartagena.edu.co" className="hover:underline hover:text-yellow-600 transition-colors">bienestar@unicartagena.edu.co</a></li>
@@ -192,14 +171,6 @@ const MainLayout = () => {
               <div className="text-center xl:text-left">
                 <p>© 2026 Universidad de Cartagena. Todos los Derechos Reservados - NIT: 890480123-5</p>
                 <p className="mt-1">Institución de Educación Superior sujeta a inspección y vigilancia por el MEN</p>
-                <p className="mt-3 text-gray-400">Sus datos personales están protegidos conforme a la Ley 1581 de 2012 y la Ley 1266 de 2008 (Habeas Data).</p>
-              </div>
-              <div className="flex space-x-3 md:space-x-4 font-medium">
-                <a href="#" className="hover:text-[#1B2631] transition-colors">Acerca de</a>
-                <span className="text-gray-300">|</span>
-                <a href="#" className="hover:text-[#1B2631] transition-colors">Política de Privacidad</a>
-                <span className="text-gray-300">|</span>
-                <a href="#" className="hover:text-[#1B2631] transition-colors">Términos y Condiciones</a>
               </div>
             </div>
           </div>
