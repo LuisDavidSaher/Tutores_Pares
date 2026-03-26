@@ -7,7 +7,7 @@ import logoUdc from '../assets/Logo_Completo.png';
 import Inicio from './Inicio.jsx';
 import GestionUsuarios from './GestionUsuarios.jsx';
 import GestionDatos from './GestionDatos.jsx';
-import Asignaturas from './Asignaturas.jsx'; // <-- EL NUEVO MÓDULO
+import GestionAcademica from './GestionAcademica.jsx'; // <-- EL NUEVO MÓDULO
 import Reportes from './Reportes.jsx';
 import Dashboard from './Dashboard.jsx';
 import Auditorias from './Auditorias.jsx';
@@ -26,7 +26,7 @@ const MainLayout = () => {
       'Inicio',
       'Gestión de Usuarios',
       'Gestión de Datos',
-      'Asignaturas',
+      'Gestión Académica',
       'Reportes',
       'Dashboard Estadísticas',
       'Auditorías'
@@ -35,8 +35,8 @@ const MainLayout = () => {
     // El Jefe de Departamento tiene visión restringida
     menuOptions = [
       'Inicio',
+      'Reportes',
       'Dashboard Estadísticas',
-      'Reportes'
     ];
   }
 
@@ -130,7 +130,7 @@ const MainLayout = () => {
           {/* Rutas Restringidas (Solo Administrador) */}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Usuarios' && <GestionUsuarios />}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Datos' && <GestionDatos />}
-          {user?.role === 'Administrador' && activeMenu === 'Asignaturas' && <Asignaturas />}
+          {user?.role === 'Administrador' && activeMenu === 'Gestión Académica' && <GestionAcademica />}
           {user?.role === 'Administrador' && activeMenu === 'Auditorías' && <Auditorias />}
           
           {/* Rutas Compartidas (Admin y Jefe) */}
