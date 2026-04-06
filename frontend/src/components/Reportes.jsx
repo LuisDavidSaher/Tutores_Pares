@@ -31,15 +31,18 @@ const safeLoadAsignaturas = () => {
   }
 };
 
+// ==========================================
+// MOCK DATA BASE 
+// ==========================================
 const mockReportesActivos = [
-  { id: 'REP-001', periodo: '2026-I', estado: 'Inicial', tutorias: [] },
-  { id: 'REP-002', periodo: '2025-II', estado: 'Final', tutorias: [] }
+  { id: 'REP-001', periodo: '2026-I', programaReporte: 'INGENIERÍA DE SISTEMAS', estado: 'Inicial', tutorias: [] },
+  { id: 'REP-002', periodo: '2025-II', programaReporte: 'MEDICINA', estado: 'Final', tutorias: [] }
 ];
 
 const datosInicialesBD = {
   "123456789": { 
     nombres: "JESUS DAVID", apellidos: "BARRIOS MARTINEZ", genero: "M", correo: "JBARRIOSM@UNICARTAGENA.EDU.CO",
-    codigo: "2024001", telefono: "3001234567", programa: "INGENIERÍA DE SISTEMAS", sede: "SAN AGUSTÍN", facultad: "INGENIERÍA", tipoDoc: "CC"
+    codigo: "2024001", telefono: "3001234567", programa: "INGENIERÍA DE SISTEMAS", campus: "ZARAGOCILLA", facultad: "INGENIERÍA", tipoDoc: "CC"
   }
 };
 
@@ -49,7 +52,7 @@ const prevenirComa = (eventoTeclado) => {
   if (eventoTeclado.key === ',') eventoTeclado.preventDefault();
 };
 
-const Reportes = () => {
+const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'INGENIERÍA DE SISTEMAS' } }) => {
   const [vistaActual, setVistaActual] = useState('pantalla1');
   const [listaReportes, setListaReportes] = useState(mockReportesActivos);
   const [dbEstudiantes] = useState(datosInicialesBD);
@@ -60,7 +63,7 @@ const Reportes = () => {
 
   // --- CATÁLOGOS ---
   const [catalogoFacultades, setCatalogoFacultades] = useState([]);
-  const [catalogoSedes, setCatalogoSedes] = useState([]);
+  const [catalogoCampus, setCatalogoCampus] = useState([]);
   const [catalogoProgramas, setCatalogoProgramas] = useState([]);
   const [catalogoAsignaturas, setCatalogoAsignaturas] = useState([]);
 
@@ -74,13 +77,13 @@ const Reportes = () => {
   
   const [tutorDatos, setTutorDatos] = useState({
     nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', 
-    codigo: '', sede: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: 'CC'
+    codigo: '', campus: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: 'CC'
   });
 
   const [tutorados, setTutorados] = useState([]);
   const [tutoradoDraft, setTutoradoDraft] = useState({
     documento: '', nombres: '', apellidos: '', genero: '', facultad: '', programa: '', 
-    codigo: '', sede: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC'
+    codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC'
   });
 
   // --- ESTADOS: FASE 2 (REPORTE FINAL) ---
@@ -94,11 +97,24 @@ const Reportes = () => {
   const [datosEdicion, setDatosEdicion] = useState({});
 
   // ==========================================
-  // FUNCIONES DE NAVEGACIÓN Y CARGA
+  // 🔗 NUEVA CONEXIÓN: OBTENER CAMPUS DEL BACKEND
   // ==========================================
+  const cargarCampusDesdeAPI = async () => {
+    try {
+      const respuesta = await fetch('http://localhost:8080/api/campus');
+      if (respuesta.ok) {
+        const datosReales = await respuesta.json();
+        // Convertimos la respuesta [{"id":1,"nombre":"ZARAGOCILLA"}] a ["ZARAGOCILLA"]
+        setCatalogoCampus(datosReales.map(c => c.nombre));
+      }
+    } catch (error) {
+      console.error("Error al cargar Campus desde Spring Boot:", error);
+    }
+  };
+
   const cargarCatalogosDinamicamente = () => {
     setCatalogoFacultades(safeLoadCatalog('sgtp_facultades'));
-    setCatalogoSedes(safeLoadCatalog('sgtp_sedes'));
+    cargarCampusDesdeAPI(); // <--- Aquí el Reporte consulta la BD Real
     setCatalogoProgramas(safeLoadCatalog('sgtp_programas'));
     setCatalogoAsignaturas(safeLoadAsignaturas());
   };
@@ -177,34 +193,29 @@ const Reportes = () => {
   };
 
   // ==========================================
-  // LÓGICA DE FORMULARIOS (FASE 1) - CORREGIDA
+  // LÓGICA DE FORMULARIOS (FASE 1)
   // ==========================================
   const buscarTutor = () => {
     const backupTipo = tutorDatos.tipoDoc;
-    setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', sede: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: backupTipo });
+    setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: backupTipo });
     
     if (dbEstudiantes[tutorDoc]) {
       const datosEncontrados = dbEstudiantes[tutorDoc];
       
-      // Verificamos si los datos del mock existen en los catálogos actuales
       const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
       const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
-      const sedeValida = catalogoSedes.includes(datosEncontrados.sede) ? datosEncontrados.sede : '';
+      const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
       setTutorDatos(prev => ({ 
         ...prev, 
         ...datosEncontrados,
         facultad: facultadValida,
         programa: programaValido,
-        sede: sedeValida
+        campus: campusValido
       })); 
       
-      // Si falta algún dato en el catálogo, NO bloqueamos para permitir que el usuario lo seleccione manualmente
-      if(!facultadValida || !programaValido || !sedeValida) {
-        setTutorBloqueado(false);
-      } else {
-        setTutorBloqueado(true);
-      }
+      if(!facultadValida || !programaValido || !campusValido) setTutorBloqueado(false);
+      else setTutorBloqueado(true);
     } else {
       setTutorBloqueado(false);
       alert("Tutor Par no encontrado en la base de datos.");
@@ -216,7 +227,6 @@ const Reportes = () => {
       alert("Complete TODOS los campos obligatorios del Tutor."); return;
     }
     
-    // VALIDACIÓN ESTRICTA DEL CORREO INSTITUCIONAL
     const dominioPermitido = "@unicartagena.edu.co";
     if (!tutorDatos.correo || !tutorDatos.correo.toLowerCase().endsWith(dominioPermitido)) {
       alert(`Por favor ingrese un correo institucional válido que termine en ${dominioPermitido}`);
@@ -229,23 +239,22 @@ const Reportes = () => {
   const buscarTutoradoDraft = () => {
     const doc = tutoradoDraft.documento;
     const backupTipo = tutoradoDraft.tipoDoc;
-    setTutoradoDraft({ documento: doc, nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', sede: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: backupTipo });
+    setTutoradoDraft({ documento: doc, nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: backupTipo });
     
     if (dbEstudiantes[doc]) {
       const datosEncontrados = dbEstudiantes[doc];
       
-      // Misma validación para el tutorado
       const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
       const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
-      const sedeValida = catalogoSedes.includes(datosEncontrados.sede) ? datosEncontrados.sede : '';
+      const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
       setTutoradoDraft(prev => ({ 
         ...prev, 
         ...datosEncontrados,
         facultad: facultadValida,
         programa: programaValido,
-        sede: sedeValida,
-        bloqueado: (facultadValida && programaValido && sedeValida) ? true : false
+        campus: campusValido,
+        bloqueado: (facultadValida && programaValido && campusValido) ? true : false
       }));
     } else {
       setTutoradoDraft(prev => ({ ...prev, bloqueado: false }));
@@ -254,12 +263,12 @@ const Reportes = () => {
   };
 
   const agregarTutorado = () => {
-    if (!tutoradoDraft.documento || !tutoradoDraft.nombres || !tutoradoDraft.apellidos || !tutoradoDraft.genero || !tutoradoDraft.promedioInicio || !tutoradoDraft.programa || !tutoradoDraft.codigo || !tutoradoDraft.sede) {
-      alert("Complete los datos obligatorios del tutorado (incluyendo Sede)."); return;
+    if (!tutoradoDraft.documento || !tutoradoDraft.nombres || !tutoradoDraft.apellidos || !tutoradoDraft.genero || !tutoradoDraft.promedioInicio || !tutoradoDraft.programa || !tutoradoDraft.codigo || !tutoradoDraft.campus) {
+      alert("Complete los datos obligatorios del tutorado (incluyendo Campus)."); return;
     }
     const nuevoTutorado = { ...tutoradoDraft, idInterno: new Date().getTime() };
     setTutorados([...tutorados, nuevoTutorado]);
-    setTutoradoDraft({ documento: '', nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', sede: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC' });
+    setTutoradoDraft({ documento: '', nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC' });
   };
 
   const agruparTutoria = (e) => {
@@ -282,7 +291,7 @@ const Reportes = () => {
     }
     
     setTutorConfirmado(false); setTutorDoc(''); setTutorados([]);
-    setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', sede: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: 'CC' });
+    setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: 'CC' });
     setVistaActual('pantalla2');
   };
 
@@ -290,14 +299,23 @@ const Reportes = () => {
     if (tutoriasBorrador.length === 0) return;
 
     const reportesActualizados = [...listaReportes];
-    const indiceExistente = reportesActualizados.findIndex(r => r.periodo === formPeriodo && r.estado === 'Inicial');
+    
+    const programaVinculado = usuarioActual.rol === 'Jefe de Departamento' ? usuarioActual.programa : 'MULTI-PROGRAMA (ADMIN)';
+    
+    const indiceExistente = reportesActualizados.findIndex(r => r.periodo === formPeriodo && r.estado === 'Inicial' && r.programaReporte === programaVinculado);
 
     if (indiceExistente !== -1) {
       const reporteExistente = reportesActualizados[indiceExistente];
       reportesActualizados[indiceExistente] = { ...reporteExistente, tutorias: [...reporteExistente.tutorias, ...tutoriasBorrador] };
       alert(`Tutorías añadidas al reporte abierto del periodo ${formPeriodo}.`);
     } else {
-      reportesActualizados.unshift({ id: `REP-${Math.floor(Math.random() * 9000)}`, periodo: formPeriodo, estado: 'Inicial', tutorias: tutoriasBorrador });
+      reportesActualizados.unshift({ 
+        id: `REP-${Math.floor(Math.random() * 9000)}`, 
+        periodo: formPeriodo, 
+        programaReporte: programaVinculado, 
+        estado: 'Inicial', 
+        tutorias: tutoriasBorrador 
+      });
       alert(`Nuevo reporte inicial generado para el periodo ${formPeriodo}.`);
     }
 
@@ -313,17 +331,22 @@ const Reportes = () => {
     volverAListado();
   };
 
-  const reportesFiltrados = listaReportes.filter(r => r.id.toLowerCase().includes(filtroReportes.toLowerCase()) || r.periodo.toLowerCase().includes(filtroReportes.toLowerCase()));
+  const reportesFiltrados = listaReportes
+    .filter(r => r.id.toLowerCase().includes(filtroReportes.toLowerCase()) || r.periodo.toLowerCase().includes(filtroReportes.toLowerCase()))
+    .filter(r => usuarioActual.rol === 'Administrador' ? true : r.programaReporte === usuarioActual.programa);
+
   const tutoriasFiltradas = tutoriasBorrador.filter(t => t.tutorNombre.toLowerCase().includes(filtroTutorias.toLowerCase()) || t.asignatura.toLowerCase().includes(filtroTutorias.toLowerCase()) || t.id.toLowerCase().includes(filtroTutorias.toLowerCase()));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-7xl mx-auto pb-10 min-h-screen">
       
-      {/* HEADER GLOBAL ESTANDARIZADO */}
+      {/* HEADER GLOBAL */}
       <div className="bg-[#1a232f] p-6 text-white flex justify-between items-center rounded-t-xl border-b-4 border-[#EBB700]">
         <div>
           <h2 className="text-xl font-bold tracking-wide">Gestión de Reportes (SGTP)</h2>
-          <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Univ. de Cartagena - Bienestar Universitario</p>
+          <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">
+            {usuarioActual.rol === 'Jefe de Departamento' ? `Programa: ${usuarioActual.programa}` : 'Panel de Administración Global'}
+          </p>
         </div>
         {vistaActual !== 'pantalla1' && (
           <button onClick={volverAListado} className="flex items-center text-sm font-semibold text-[#EBB700] hover:text-yellow-400 transition-colors border border-[#EBB700] px-4 py-2 rounded-lg">
@@ -352,12 +375,13 @@ const Reportes = () => {
 
             <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm">
               <thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold">
-                <tr><th className="p-4">Reporte No.</th><th className="p-4">Periodo Académico</th><th className="p-4 text-center">Tutorías Agrupadas</th><th className="p-4 text-center">Estado</th><th className="p-4 text-center">Acciones</th></tr>
+                <tr><th className="p-4">Reporte No.</th><th className="p-4">Programa</th><th className="p-4">Periodo Académico</th><th className="p-4 text-center">Tutorías Agrupadas</th><th className="p-4 text-center">Estado</th><th className="p-4 text-center">Acciones</th></tr>
               </thead>
               <tbody className="text-sm divide-y">
                 {reportesFiltrados.map((rep) => (
                   <tr key={rep.id} className="hover:bg-gray-50">
                     <td className="p-4 font-semibold text-[#1B2631]">{rep.id}</td>
+                    <td className="p-4 font-semibold text-gray-600 text-xs">{rep.programaReporte}</td>
                     <td className="p-4 font-medium text-gray-600">{rep.periodo}</td>
                     <td className="p-4 text-center font-bold text-blue-600">{rep.tutorias ? rep.tutorias.length : 0}</td>
                     <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${rep.estado === 'Final' ? 'bg-gray-200 text-gray-700 border border-gray-300' : 'bg-green-50 text-green-700 border border-green-200'}`}>{rep.estado}</span></td>
@@ -377,7 +401,7 @@ const Reportes = () => {
                     </td>
                   </tr>
                 ))}
-                {reportesFiltrados.length === 0 && <tr><td colSpan="5" className="text-center p-8 text-gray-500">No se encontraron reportes.</td></tr>}
+                {reportesFiltrados.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-gray-500">No se encontraron reportes.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -423,7 +447,6 @@ const Reportes = () => {
                           </td>
                         </tr>
                         
-                        {/* DESPLEGABLE DE EDICIÓN */}
                         {tutoriaExpandida === tut.id && (
                           <tr className="bg-gray-50 border-b-4 border-gray-300">
                             <td colSpan="5" className="p-6">
@@ -447,7 +470,7 @@ const Reportes = () => {
                                           <div className="col-span-3"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Apellidos</label><input type="text" value={datosEdicion.apellidos} onChange={(e) => setDatosEdicion({...datosEdicion, apellidos: limpiarTexto(e.target.value)})} className="w-full border px-2 py-1.5 text-xs rounded"/></div>
                                           <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Género</label><select value={datosEdicion.genero} onChange={(e) => setDatosEdicion({...datosEdicion, genero: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded"><option value="M">M</option><option value="F">F</option></select></div>
                                           <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Código Estudiantil</label><input type="text" value={datosEdicion.codigo} onChange={(e) => setDatosEdicion({...datosEdicion, codigo: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded"/></div>
-                                          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Sede</label><select value={datosEdicion.sede} onChange={(e) => setDatosEdicion({...datosEdicion, sede: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded"><option value="">SEDE...</option>{catalogoSedes.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                                          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Campus</label><select value={datosEdicion.campus} onChange={(e) => setDatosEdicion({...datosEdicion, campus: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded"><option value="">CAMPUS...</option>{catalogoCampus.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
                                           <div className="col-span-3"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Programa</label><select value={datosEdicion.programa} onChange={(e) => setDatosEdicion({...datosEdicion, programa: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded">{catalogoProgramas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                                           <div className="col-span-3 lg:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Riesgo Inicial</label><select value={datosEdicion.riesgo} onChange={(e) => setDatosEdicion({...datosEdicion, riesgo: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded font-bold text-yellow-700"><option value="BAJO">BAJO RENDIMIENTO</option><option value="ALTO">ALTO RIESGO</option></select></div>
                                           <div className="col-span-3 lg:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Prom. Inicio</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} value={datosEdicion.promedioInicio} onChange={(e) => setDatosEdicion({...datosEdicion, promedioInicio: e.target.value})} className="w-full border px-2 py-1.5 text-xs rounded font-bold"/></div>
@@ -468,7 +491,7 @@ const Reportes = () => {
                                           <div>
                                             <p className="text-xs font-bold text-gray-700">Prog: <span className="font-normal">{tutorado.programa}</span></p>
                                             <p className="text-xs font-bold text-gray-700 mt-1">Cód: <span className="font-normal">{tutorado.codigo}</span></p>
-                                            <p className="text-xs font-bold text-gray-700 mt-1">Sede: <span className="font-normal">{tutorado.sede}</span></p>
+                                            <p className="text-xs font-bold text-gray-700 mt-1">Campus: <span className="font-normal">{tutorado.campus}</span></p>
                                           </div>
                                           <div>
                                             <p className="text-xs font-bold text-gray-700 bg-gray-100 inline-block px-2 py-1 rounded">Riesgo Inicial: <span className="text-yellow-600">{tutorado.riesgo}</span></p>
@@ -563,9 +586,9 @@ const Reportes = () => {
                   <select value={tutorDatos.programa} onChange={(e) => setTutorDatos({...tutorDatos, programa: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">PROGRAMA...</option>{catalogoProgramas.map(p => <option key={p} value={p}>{p}</option>)}</select>}
                 </div>
                 
-                <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Sede</label>
-                  {catalogoSedes.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">Cree una Sede en Gestión Académica</span> : 
-                  <select value={tutorDatos.sede} onChange={(e) => setTutorDatos({...tutorDatos, sede: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">SEDE...</option>{catalogoSedes.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Campus</label>
+                  {catalogoCampus.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">Cree un Campus en Gestión Académica</span> : 
+                  <select value={tutorDatos.campus} onChange={(e) => setTutorDatos({...tutorDatos, campus: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">CAMPUS...</option>{catalogoCampus.map(s => <option key={s} value={s}>{s}</option>)}</select>}
                 </div>
                 
                 <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Correo Institucional</label><input type="email" value={tutorDatos.correo} onChange={(e) => setTutorDatos({...tutorDatos, correo: e.target.value})} placeholder="@unicartagena.edu.co" className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required/></div>
@@ -617,7 +640,7 @@ const Reportes = () => {
                     
                     <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Facultad</label><select value={tutoradoDraft.facultad} onChange={(e) => setTutoradoDraft({...tutoradoDraft, facultad: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white" disabled={tutoradoDraft.bloqueado}><option value="">FACULTAD...</option>{catalogoFacultades.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
                     <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Programa</label><select value={tutoradoDraft.programa} onChange={(e) => setTutoradoDraft({...tutoradoDraft, programa: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white" disabled={tutoradoDraft.bloqueado}><option value="">PROGRAMA...</option>{catalogoProgramas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-                    <div className="col-span-2 md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Sede</label><select value={tutoradoDraft.sede} onChange={(e) => setTutoradoDraft({...tutoradoDraft, sede: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white" disabled={tutoradoDraft.bloqueado}><option value="">SEDE...</option>{catalogoSedes.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                    <div className="col-span-2 md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Campus</label><select value={tutoradoDraft.campus} onChange={(e) => setTutoradoDraft({...tutoradoDraft, campus: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white" disabled={tutoradoDraft.bloqueado}><option value="">CAMPUS...</option>{catalogoCampus.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
                     
                     <div className="col-span-2 md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Riesgo Inicial</label><select value={tutoradoDraft.riesgo} onChange={(e) => setTutoradoDraft({...tutoradoDraft, riesgo: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white focus:border-[#1B2631] font-bold text-yellow-700"><option value="">SELECCIONE...</option><option value="BAJO">BAJO RENDIMIENTO</option><option value="ALTO">ALTO RIESGO</option></select></div>
                     <div className="col-span-2 md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Prom. Inicial</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} value={tutoradoDraft.promedioInicio} onChange={(e) => setTutoradoDraft({...tutoradoDraft, promedioInicio: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs font-bold focus:border-[#1B2631]" /></div>
