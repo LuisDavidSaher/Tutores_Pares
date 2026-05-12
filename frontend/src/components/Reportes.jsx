@@ -1,48 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-// ==========================================
-// FUNCIONES SEGURAS DE CARGA
-// ==========================================
-const safeLoadCatalog = (key) => {
+// --- CUERVO MENSAJERO DE AUDITORÍA ---
+const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
   try {
-    const data = localStorage.getItem(key);
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (parsed.length > 0) return parsed.map(item => item.nombre);
-    }
-    return [];
-  } catch (error) {
-    console.error("Aviso: Memoria local inaccesible", error);
-    return [];
-  }
-};
-
-const safeLoadAsignaturas = () => {
-  try {
-    const data = localStorage.getItem('sgtp_asignaturas');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (parsed.length > 0) return parsed.map(item => `${item.codigo} - ${item.nombre}`);
-    }
-    return [];
-  } catch (error) {
-    console.error("Aviso: Memoria local inaccesible", error);
-    return [];
-  }
-};
-
-// ==========================================
-// MOCK DATA BASE 
-// ==========================================
-const mockReportesActivos = [
-  { id: 'REP-001', periodo: '2026-I', programaReporte: 'INGENIERÍA DE SISTEMAS', estado: 'Inicial', tutorias: [] },
-  { id: 'REP-002', periodo: '2025-II', programaReporte: 'MEDICINA', estado: 'Final', tutorias: [] }
-];
-
-const datosInicialesBD = {
-  "123456789": { 
-    nombres: "JESUS DAVID", apellidos: "BARRIOS MARTINEZ", genero: "M", correo: "JBARRIOSM@UNICARTAGENA.EDU.CO",
-    codigo: "2024001", telefono: "3001234567", programa: "INGENIERÍA DE SISTEMAS", campus: "ZARAGOCILLA", facultad: "INGENIERÍA", tipoDoc: "CC"
+    await fetch('http://localhost:8080/api/auditorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, modulo, accion, detalle, estado })
+    });
+  } catch (e) { 
+    console.error("Fallo Auditoría silenciosa", e); 
   }
 };
 
@@ -54,13 +21,21 @@ const prevenirComa = (eventoTeclado) => {
 
 const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'INGENIERÍA DE SISTEMAS' } }) => {
   const [vistaActual, setVistaActual] = useState('pantalla1');
-  const [listaReportes, setListaReportes] = useState(mockReportesActivos);
-  const [dbEstudiantes] = useState(datosInicialesBD);
+  const [listaReportes, setListaReportes] = useState([]); 
   const [tutoriasBorrador, setTutoriasBorrador] = useState([]); 
 
   const [filtroReportes, setFiltroReportes] = useState('');
   const [filtroTutorias, setFiltroTutorias] = useState('');
 
+// 🛡️ SELLO DE IDENTIDAD COMPLETO PARA AUDITORÍA
+  const emailReal = usuarioActual.email || (usuarioActual.rol === 'Administrador' ? 'admin.prueba@unicartagena.edu.co' : 'jefe.sistemas@unicartagena.edu.co');
+  const programaReal = usuarioActual.programa || 'Sistemas';
+  
+  // Fusionamos Rol, Programa y Correo. Mantenemos el nombre de la variable "correoUsuario" 
+  // para no tener que cambiar nada en el resto del código abajo.
+  const correoUsuario = usuarioActual.rol === 'Administrador' 
+    ? `Administrador Global (${emailReal})` 
+    : `Jefe de ${programaReal} (${emailReal})`;
   // --- CATÁLOGOS ---
   const [catalogoFacultades, setCatalogoFacultades] = useState([]);
   const [catalogoCampus, setCatalogoCampus] = useState([]);
@@ -91,66 +66,71 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   const [filtroTutorFase2, setFiltroTutorFase2] = useState('');
   const [tutoriasExpandidasFase2, setTutoriasExpandidasFase2] = useState([]);
 
-  // --- ESTADOS: EDICIÓN INLINE (PANTALLA 2) ---
   const [tutoriaExpandida, setTutoriaExpandida] = useState(null);
   const [tutoradoEnEdicion, setTutoradoEnEdicion] = useState(null); 
   const [datosEdicion, setDatosEdicion] = useState({});
 
   // ==========================================
-  // 🔗 NUEVA CONEXIÓN: OBTENER CAMPUS DEL BACKEND
+  // 🔗 CONEXIÓN A SPRING BOOT (CATÁLOGOS Y REPORTES)
   // ==========================================
-  const cargarCampusDesdeAPI = async () => {
+  const cargarDatosDesdeAPI = async () => {
     try {
-      const respuesta = await fetch('http://localhost:8080/api/campus');
-      if (respuesta.ok) {
-        const datosReales = await respuesta.json();
-        // Convertimos la respuesta [{"id":1,"nombre":"ZARAGOCILLA"}] a ["ZARAGOCILLA"]
-        setCatalogoCampus(datosReales.map(c => c.nombre));
+      const [resCampus, resFacultades, resProgramas, resAsignaturas, resReportes] = await Promise.all([
+        fetch('http://localhost:8080/api/campus'),
+        fetch('http://localhost:8080/api/facultades'),
+        fetch('http://localhost:8080/api/programas'),
+        fetch('http://localhost:8080/api/asignaturas'),
+        fetch('http://localhost:8080/api/reportes') 
+      ]);
+
+      if (resCampus.ok) {
+        const data = await resCampus.json();
+        setCatalogoCampus(data.map(c => c.nombre));
+      }
+      if (resFacultades.ok) {
+        const data = await resFacultades.json();
+        setCatalogoFacultades(data.map(f => f.nombre));
+      }
+      if (resProgramas.ok) {
+        const data = await resProgramas.json();
+        setCatalogoProgramas(data.map(p => p.nombre));
+      }
+      if (resAsignaturas.ok) {
+        const data = await resAsignaturas.json();
+        setCatalogoAsignaturas(data.map(a => `${a.codigo} - ${a.nombre}`));
+      }
+      if (resReportes.ok) {
+        const data = await resReportes.json();
+        setListaReportes(data.reverse()); 
       }
     } catch (error) {
-      console.error("Error al cargar Campus desde Spring Boot:", error);
+      console.error("Error al cargar datos desde Spring Boot:", error);
     }
   };
 
-  const cargarCatalogosDinamicamente = () => {
-    setCatalogoFacultades(safeLoadCatalog('sgtp_facultades'));
-    cargarCampusDesdeAPI(); // <--- Aquí el Reporte consulta la BD Real
-    setCatalogoProgramas(safeLoadCatalog('sgtp_programas'));
-    setCatalogoAsignaturas(safeLoadAsignaturas());
-  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    cargarDatosDesdeAPI(); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const volverAListado = () => { setVistaActual('pantalla1'); setFiltroReportes(''); };
-  
-  const irAPantalla2 = () => { 
-    cargarCatalogosDinamicamente();
-    setVistaActual('pantalla2'); setFiltroTutorias(''); 
-  };
-  
-  const irAPantalla3 = () => { 
-    cargarCatalogosDinamicamente();
-    setVistaActual('pantalla3'); 
-  };
+  const volverAListado = () => { setVistaActual('pantalla1'); setFiltroReportes(''); cargarDatosDesdeAPI(); };
+  const irAPantalla2 = () => { cargarDatosDesdeAPI(); setVistaActual('pantalla2'); setFiltroTutorias(''); };
+  const irAPantalla3 = () => { cargarDatosDesdeAPI(); setVistaActual('pantalla3'); };
 
   const iniciarFase2 = (reporte) => {
-    if(!reporte.tutorias || reporte.tutorias.length === 0) {
-        alert("Este reporte no tiene tutorías agrupadas para finalizar."); return;
-    }
-    setReporteACompletar(reporte);
-    setFiltroTutorFase2(''); 
-    setTutoriasExpandidasFase2([]); 
-    setVistaActual('pantalla4');
+    if(!reporte.tutorias || reporte.tutorias.length === 0) { alert("Este reporte no tiene tutorías agrupadas para finalizar."); return; }
+    setReporteACompletar(reporte); setFiltroTutorFase2(''); setTutoriasExpandidasFase2([]); setVistaActual('pantalla4');
   };
 
-  const simularDescargaPDF = (idReporte = "Borrador") => {
-    alert(`📄 Generando PDF para el reporte [${idReporte}]...\n\n[El archivo SGTP_Reporte_${idReporte}.pdf se ha descargado.]`);
+  const simularDescargaPDF = (idReporte = "Borrador") => { 
+    alert(`📄 Generando PDF para el reporte [${idReporte}]...`); 
+    enviarAuditoria(correoUsuario, "REPORTES", "EXPORTACIÓN", `Descargó el PDF del reporte ${idReporte}`);
   };
 
   const toggleExpandirTutoriaFase2 = (id) => {
-    if (tutoriasExpandidasFase2.includes(id)) {
-      setTutoriasExpandidasFase2(tutoriasExpandidasFase2.filter(tId => tId !== id));
-    } else {
-      setTutoriasExpandidasFase2([...tutoriasExpandidasFase2, id]);
-    }
+    if (tutoriasExpandidasFase2.includes(id)) { setTutoriasExpandidasFase2(tutoriasExpandidasFase2.filter(tId => tId !== id)); } 
+    else { setTutoriasExpandidasFase2([...tutoriasExpandidasFase2, id]); }
   };
 
   const toggleExpandirTutoria = (id) => {
@@ -159,14 +139,11 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   };
 
   const iniciarEdicionTutorado = (tutoriaId, index, tutoradoActual) => {
-    setTutoradoEnEdicion({ tutoriaId, index });
-    setDatosEdicion({ ...tutoradoActual });
+    setTutoradoEnEdicion({ tutoriaId, index }); setDatosEdicion({ ...tutoradoActual });
   };
 
   const guardarEdicionTutorado = () => {
-    if(!datosEdicion.documento || !datosEdicion.nombres || !datosEdicion.apellidos) {
-      alert("Faltan datos obligatorios del tutorado."); return;
-    }
+    if(!datosEdicion.documento || !datosEdicion.nombres || !datosEdicion.apellidos) { alert("Faltan datos obligatorios del tutorado."); return; }
     const nuevasTutorias = tutoriasBorrador.map(tut => {
       if (tut.id === tutoradoEnEdicion.tutoriaId) {
         const nuevaLista = [...tut.tutoradosList];
@@ -175,8 +152,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       }
       return tut;
     });
-    setTutoriasBorrador(nuevasTutorias);
-    setTutoradoEnEdicion(null);
+    setTutoriasBorrador(nuevasTutorias); setTutoradoEnEdicion(null);
   };
 
   const eliminarTutoradoInline = (tutoriaId, index) => {
@@ -192,80 +168,123 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setTutoriasBorrador(nuevasTutorias);
   };
 
-  // ==========================================
-  // LÓGICA DE FORMULARIOS (FASE 1)
-  // ==========================================
-  const buscarTutor = () => {
+  // ==============================================================
+  // 🔗 MAGIA DEL BACKEND: GESTIÓN DE ESTUDIANTES (TUTOR Y TUTORADO)
+  // ==============================================================
+  
+  const buscarTutor = async () => {
+    if (!tutorDoc) { alert("Ingrese un documento para buscar."); return; }
+    
     const backupTipo = tutorDatos.tipoDoc;
     setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: backupTipo });
     
-    if (dbEstudiantes[tutorDoc]) {
-      const datosEncontrados = dbEstudiantes[tutorDoc];
+    try {
+      const respuesta = await fetch(`http://localhost:8080/api/estudiantes/${tutorDoc}`);
       
-      const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
-      const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
-      const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
+      if (respuesta.ok) {
+        const datosEncontrados = await respuesta.json();
+        const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
+        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
+        const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
-      setTutorDatos(prev => ({ 
-        ...prev, 
-        ...datosEncontrados,
-        facultad: facultadValida,
-        programa: programaValido,
-        campus: campusValido
-      })); 
-      
-      if(!facultadValida || !programaValido || !campusValido) setTutorBloqueado(false);
-      else setTutorBloqueado(true);
-    } else {
+        setTutorDatos(prev => ({ 
+          ...prev, 
+          ...datosEncontrados,
+          facultad: facultadValida,
+          programa: programaValido,
+          campus: campusValido
+        })); 
+        
+        if(!facultadValida || !programaValido || !campusValido) setTutorBloqueado(false);
+        else setTutorBloqueado(true);
+      } else {
+        setTutorBloqueado(false);
+        alert("Tutor Par no encontrado. Los campos se han habilitado para que ingrese sus datos por primera vez.");
+      }
+    } catch (error) {
+      console.error("Error buscando en la BD:", error);
       setTutorBloqueado(false);
-      alert("Tutor Par no encontrado en la base de datos.");
     }
   };
 
-  const confirmarTutor = () => {
+  const confirmarTutor = async () => {
     if (!tutorDatos.nombres || !tutorDatos.apellidos || !tutorDatos.promedio || !tutorDatos.notaAsignatura || !tutorDatos.programa || !tutorDatos.facultad || !tutorDatos.codigo) {
       alert("Complete TODOS los campos obligatorios del Tutor."); return;
     }
-    
     const dominioPermitido = "@unicartagena.edu.co";
     if (!tutorDatos.correo || !tutorDatos.correo.toLowerCase().endsWith(dominioPermitido)) {
-      alert(`Por favor ingrese un correo institucional válido que termine en ${dominioPermitido}`);
-      return;
+      alert(`Por favor ingrese un correo institucional válido que termine en ${dominioPermitido}`); return;
+    }
+
+    if (!tutorBloqueado) {
+      const nuevoEstudiante = {
+        documento: tutorDoc, tipoDoc: tutorDatos.tipoDoc, nombres: tutorDatos.nombres, apellidos: tutorDatos.apellidos,
+        genero: tutorDatos.genero, codigo: tutorDatos.codigo, campus: tutorDatos.campus, facultad: tutorDatos.facultad,
+        programa: tutorDatos.programa, correo: tutorDatos.correo
+      };
+      try {
+        await fetch('http://localhost:8080/api/estudiantes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nuevoEstudiante) });
+        enviarAuditoria(correoUsuario, "ESTUDIANTES", "CREACIÓN", `Registró en BD al estudiante (Tutor): ${tutorDatos.nombres} ${tutorDatos.apellidos}`);
+      } catch (error) { 
+        console.error("Fallo guardado automático en BD:", error); 
+        enviarAuditoria(correoUsuario, "ESTUDIANTES", "ERROR", `Fallo al registrar Tutor en BD`, "Alerta");
+      }
     }
 
     setTutorConfirmado(true);
   };
 
-  const buscarTutoradoDraft = () => {
+  const buscarTutoradoDraft = async () => {
     const doc = tutoradoDraft.documento;
+    if (!doc) { alert("Ingrese el documento del tutorado."); return; }
+
     const backupTipo = tutoradoDraft.tipoDoc;
     setTutoradoDraft({ documento: doc, nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: backupTipo });
     
-    if (dbEstudiantes[doc]) {
-      const datosEncontrados = dbEstudiantes[doc];
+    try {
+      const respuesta = await fetch(`http://localhost:8080/api/estudiantes/${doc}`);
       
-      const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
-      const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
-      const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
+      if (respuesta.ok) {
+        const datosEncontrados = await respuesta.json();
+        const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
+        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
+        const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
-      setTutoradoDraft(prev => ({ 
-        ...prev, 
-        ...datosEncontrados,
-        facultad: facultadValida,
-        programa: programaValido,
-        campus: campusValido,
-        bloqueado: (facultadValida && programaValido && campusValido) ? true : false
-      }));
-    } else {
+        setTutoradoDraft(prev => ({ 
+          ...prev, 
+          ...datosEncontrados,
+          facultad: facultadValida, programa: programaValido, campus: campusValido,
+          bloqueado: (facultadValida && programaValido && campusValido) ? true : false
+        }));
+      } else {
+        setTutoradoDraft(prev => ({ ...prev, bloqueado: false }));
+        alert("Tutorado no encontrado. Llene los datos para registrarlo.");
+      }
+    } catch (error) {
+      console.error("Error buscando en la BD:", error);
       setTutoradoDraft(prev => ({ ...prev, bloqueado: false }));
-      alert("Tutorado no encontrado en la base de datos.");
     }
   };
 
-  const agregarTutorado = () => {
+  const agregarTutorado = async () => {
     if (!tutoradoDraft.documento || !tutoradoDraft.nombres || !tutoradoDraft.apellidos || !tutoradoDraft.genero || !tutoradoDraft.promedioInicio || !tutoradoDraft.programa || !tutoradoDraft.codigo || !tutoradoDraft.campus) {
       alert("Complete los datos obligatorios del tutorado (incluyendo Campus)."); return;
     }
+
+    if (!tutoradoDraft.bloqueado) {
+      const nuevoEstudiante = {
+        documento: tutoradoDraft.documento, tipoDoc: tutoradoDraft.tipoDoc, nombres: tutoradoDraft.nombres, apellidos: tutoradoDraft.apellidos,
+        genero: tutoradoDraft.genero, codigo: tutoradoDraft.codigo, campus: tutoradoDraft.campus, facultad: tutoradoDraft.facultad,
+        programa: tutoradoDraft.programa, correo: tutoradoDraft.correo || ''
+      };
+      try {
+        await fetch('http://localhost:8080/api/estudiantes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nuevoEstudiante) });
+        enviarAuditoria(correoUsuario, "ESTUDIANTES", "CREACIÓN", `Registró en BD al estudiante (Tutorado): ${tutoradoDraft.nombres} ${tutoradoDraft.apellidos}`);
+      } catch (error) { 
+        console.error("Fallo guardado automático en BD:", error); 
+      }
+    }
+
     const nuevoTutorado = { ...tutoradoDraft, idInterno: new Date().getTime() };
     setTutorados([...tutorados, nuevoTutorado]);
     setTutoradoDraft({ documento: '', nombres: '', apellidos: '', genero: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC' });
@@ -290,45 +309,70 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       }]);
     }
     
+    enviarAuditoria(correoUsuario, "REPORTES", "CREACIÓN", `Estructuró una nueva tutoría de ${formAsignatura} con ${tutorados.length} tutorado(s)`);
     setTutorConfirmado(false); setTutorDoc(''); setTutorados([]);
     setTutorDatos({ nombres: '', apellidos: '', genero: '', telefono: '', facultad: '', programa: '', codigo: '', campus: '', correo: '', promedio: '', notaAsignatura: '', tipoDoc: 'CC' });
     setVistaActual('pantalla2');
   };
 
-  const guardarReporteInicial = () => {
+  // ==============================================================
+  // 🔗 NUEVO: GUARDAR REPORTE EN SPRING BOOT
+  // ==============================================================
+  const guardarReporteInicial = async () => {
     if (tutoriasBorrador.length === 0) return;
 
-    const reportesActualizados = [...listaReportes];
-    
     const programaVinculado = usuarioActual.rol === 'Jefe de Departamento' ? usuarioActual.programa : 'MULTI-PROGRAMA (ADMIN)';
     
-    const indiceExistente = reportesActualizados.findIndex(r => r.periodo === formPeriodo && r.estado === 'Inicial' && r.programaReporte === programaVinculado);
+    const nuevoReporte = {
+      id: `REP-${Math.floor(Math.random() * 9000)}`, 
+      periodo: formPeriodo, 
+      programaReporte: programaVinculado, 
+      estado: 'Inicial', 
+      tutorias: tutoriasBorrador 
+    };
 
-    if (indiceExistente !== -1) {
-      const reporteExistente = reportesActualizados[indiceExistente];
-      reportesActualizados[indiceExistente] = { ...reporteExistente, tutorias: [...reporteExistente.tutorias, ...tutoriasBorrador] };
-      alert(`Tutorías añadidas al reporte abierto del periodo ${formPeriodo}.`);
-    } else {
-      reportesActualizados.unshift({ 
-        id: `REP-${Math.floor(Math.random() * 9000)}`, 
-        periodo: formPeriodo, 
-        programaReporte: programaVinculado, 
-        estado: 'Inicial', 
-        tutorias: tutoriasBorrador 
+    try {
+      const respuesta = await fetch('http://localhost:8080/api/reportes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoReporte)
       });
-      alert(`Nuevo reporte inicial generado para el periodo ${formPeriodo}.`);
-    }
 
-    setListaReportes(reportesActualizados);
-    setTutoriasBorrador([]);
-    volverAListado();
+      if (respuesta.ok) {
+        alert(`Nuevo reporte inicial generado y guardado en la Base de Datos.`);
+        enviarAuditoria(correoUsuario, "REPORTES", "CREACIÓN", `Guardó el Reporte Inicial (${nuevoReporte.id}) en la Base de Datos`);
+        setTutoriasBorrador([]);
+        volverAListado();
+      } else {
+        alert("Hubo un error al guardar el reporte en el servidor.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo conectar al servidor para guardar el reporte.");
+    }
   };
 
-  const procesarReporteFinal = (e) => {
+  // ==============================================================
+  // 🔗 NUEVO: ACTUALIZAR ESTADO A "FINAL" EN SPRING BOOT
+  // ==============================================================
+  const procesarReporteFinal = async (e) => {
     e.preventDefault();
-    setListaReportes(listaReportes.map(r => r.id === reporteACompletar.id ? { ...r, estado: 'Final' } : r));
-    alert("¡Reporte Finalizado exitosamente!");
-    volverAListado();
+    try {
+      const respuesta = await fetch(`http://localhost:8080/api/reportes/${reporteACompletar.id}/estado`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'Final' })
+      });
+
+      if (respuesta.ok) {
+        alert("¡Reporte Finalizado y actualizado en la Base de Datos!");
+        enviarAuditoria(correoUsuario, "REPORTES", "EDICIÓN", `Cerró con éxito el Reporte Final ${reporteACompletar.id}`);
+        volverAListado();
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error de conexión al intentar finalizar el reporte.");
+    }
   };
 
   const reportesFiltrados = listaReportes
@@ -401,7 +445,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                     </td>
                   </tr>
                 ))}
-                {reportesFiltrados.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-gray-500">No se encontraron reportes.</td></tr>}
+                {reportesFiltrados.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-gray-500">No se encontraron reportes reales en BD.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -459,7 +503,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                               
                               <div className="grid grid-cols-1 gap-4">
                                 {tut.tutoradosList.map((tutorado, index) => (
-                                  <div key={tutorado.idInterno} className="bg-white border border-gray-200 p-5 rounded-lg shadow-sm">
+                                  <div key={tutorado.idInterno || index} className="bg-white border border-gray-200 p-5 rounded-lg shadow-sm">
                                     
                                     {tutoradoEnEdicion?.tutoriaId === tut.id && tutoradoEnEdicion?.index === index ? (
                                       <div className="space-y-4">
@@ -548,7 +592,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Periodo Académico Actual</label>
                   <select value={formPeriodo} onChange={(e) => setFormPeriodo(e.target.value)} className="w-full px-4 py-2.5 border rounded font-medium outline-none bg-white text-sm focus:border-[#1B2631]" required disabled={tutorConfirmado}>
-                    <option value="2026-I">2026-I</option><option value="2026-II">2026-II</option>
+                    <option value="2026-I">2026-I</option>
                   </select>
                 </div>
               </div>
@@ -577,17 +621,17 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                 <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Teléfono</label><input type="tel" value={tutorDatos.telefono} onChange={(e) => setTutorDatos({...tutorDatos, telefono: e.target.value})} placeholder="3000000000" className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required/></div>
                 
                 <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Facultad</label>
-                  {catalogoFacultades.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">Cree una Facultad en el módulo Gestión Académica</span> : 
+                  {catalogoFacultades.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">No hay facultades creadas</span> : 
                   <select value={tutorDatos.facultad} onChange={(e) => setTutorDatos({...tutorDatos, facultad: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">FACULTAD...</option>{catalogoFacultades.map(f => <option key={f} value={f}>{f}</option>)}</select>}
                 </div>
                 
                 <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Programa</label>
-                  {catalogoProgramas.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">Cree un Programa en Gestión Académica</span> : 
+                  {catalogoProgramas.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">No hay programas creados</span> : 
                   <select value={tutorDatos.programa} onChange={(e) => setTutorDatos({...tutorDatos, programa: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">PROGRAMA...</option>{catalogoProgramas.map(p => <option key={p} value={p}>{p}</option>)}</select>}
                 </div>
                 
                 <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Campus</label>
-                  {catalogoCampus.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">Cree un Campus en Gestión Académica</span> : 
+                  {catalogoCampus.length === 0 ? <span className="text-xs text-red-500 font-bold block mt-2">No hay campus creados</span> : 
                   <select value={tutorDatos.campus} onChange={(e) => setTutorDatos({...tutorDatos, campus: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded text-xs bg-white focus:border-[#1B2631]" disabled={tutorBloqueado || tutorConfirmado} required><option value="">CAMPUS...</option>{catalogoCampus.map(s => <option key={s} value={s}>{s}</option>)}</select>}
                 </div>
                 
@@ -685,7 +729,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                           <p className="text-[11px] text-gray-500 font-semibold tracking-wide mt-1 truncate">Asignatura: {tutoria.asignatura} | Tutorados: {tutoria.tutoradosList.length}</p>
                        </div>
                        
-                       {/* BOTÓN HORIZONTAL Y COMPACTO PARA NO ESTIRAR LA CAJA */}
                        <div className="flex items-center gap-2 bg-yellow-50 px-3 py-1.5 rounded-lg border border-[#EBB700] w-full md:w-auto justify-between">
                           <label className="text-[10px] font-bold text-gray-800 uppercase tracking-wider m-0">Dictamen:</label>
                           <select className="font-bold outline-none bg-transparent text-[#1B2631] text-xs border-b border-[#EBB700] m-0" required>
@@ -699,14 +742,15 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                           <h5 className="font-bold text-[#1B2631] text-xs mb-4 uppercase tracking-wider flex items-center border-b border-gray-100 pb-2">Evaluación Final de Tutorados</h5>
                           <div className="space-y-6">
                              {tutoria.tutoradosList.map((tutorado, idxTutorado) => (
-                                <div key={idxTutorado} className="bg-gray-50 p-5 rounded-lg border border-gray-200 border-t-2 border-t-[#1B2631]">
+                                <div key={tutorado.idInterno || idxTutorado} className="bg-gray-50 p-5 rounded-lg border border-gray-200 border-t-2 border-t-[#1B2631]">
                                    <p className="font-bold text-gray-800 mb-4 text-sm">{tutorado.nombres} {tutorado.apellidos} <span className="text-gray-500 font-normal text-xs ml-1">(ID: {tutorado.documento})</span></p>
                                    
-                                   <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-4">
+                                   <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-4">
                                       <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Inicio</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
                                       <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Fin</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
                                       <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tot. Sesiones</label><input type="number" min="0" placeholder="Ej: 12" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nota Final</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.5" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none font-bold bg-white focus:border-[#1B2631]" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nota Final (Materia)</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.5" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none font-bold bg-white focus:border-[#1B2631]" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Prom. Acum. Final</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.2" className="w-full px-3 py-2 border border-yellow-300 rounded text-xs outline-none font-bold text-yellow-700 bg-yellow-50 focus:border-[#EBB700]" required /></div>
                                       <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">¿Cargado SIRE?</label><select className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required><option value="">...</option><option value="SI">SÍ</option><option value="NO">NO</option></select></div>
                                    </div>
 

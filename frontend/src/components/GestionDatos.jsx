@@ -1,20 +1,9 @@
-import React, { useState } from 'react';
-
-// --- MOCK DATA PARA LA BASE DE DATOS MAESTRA ---
-const mockTutores = [
-  { id: 1, documento: '123456789', nombres: 'JESUS DAVID', apellidos: 'BARRIOS MARTINEZ', programa: 'INGENIERÍA DE SISTEMAS', periodo: '2026-I', asignaturas: 'FÍSICA, CÁLCULO', estado: 'ACTIVO' },
-  { id: 2, documento: '987654321', nombres: 'CARLOS ANDRES', apellidos: 'RUIZ', programa: 'MEDICINA', periodo: '2025-II', asignaturas: 'MORFOLOGÍA', estado: 'INACTIVO' },
-  { id: 3, documento: '112233445', nombres: 'MARIA PAULA', apellidos: 'PEREZ', programa: 'DERECHO', periodo: '2026-I', asignaturas: 'DERECHO CIVIL', estado: 'ACTIVO' },
-];
-
-const mockTutorados = [
-  { id: 1, documento: '445566778', nombres: 'LUIS FERNANDO', apellidos: 'GOMEZ', programa: 'INGENIERÍA DE SISTEMAS', periodo: '2026-I', riesgo: 'ALTO', promedio: '2.5' },
-  { id: 2, documento: '556677889', nombres: 'ANA SOFIA', apellidos: 'MARTINEZ', programa: 'MEDICINA', periodo: '2025-II', riesgo: 'BAJO', promedio: '3.8' },
-  { id: 3, documento: '998877665', nombres: 'PEDRO', apellidos: 'PASCAL', programa: 'INGENIERÍA DE SISTEMAS', periodo: '2026-I', riesgo: 'ALTO', promedio: '2.8' },
-];
+import React, { useState, useEffect } from 'react';
 
 const GestionDatos = () => {
   const [pestaña, setPestaña] = useState('tutores'); 
+  const [datos, setDatos] = useState([]);
+  const [cargando, setCargando] = useState(false);
   
   // Filtros Generales
   const [busqueda, setBusqueda] = useState('');
@@ -25,17 +14,46 @@ const GestionDatos = () => {
   const [ordenCampo, setOrdenCampo] = useState('nombres');
   const [ordenAsc, setOrdenAsc] = useState(true);
 
-  // Extraer listas únicas
-  const programasUnicos = [...new Set([...mockTutores, ...mockTutorados].map(item => item.programa))];
-  const periodosUnicos = [...new Set([...mockTutores, ...mockTutorados].map(item => item.periodo))];
+  // 🔗 CONEXIÓN AL BACKEND
+  const cargarDatosMaestros = async () => {
+    setCargando(true);
+    try {
+      // Definimos la ruta según la pestaña (estos endpoints los crearemos en Java a continuación)
+      const endpoint = pestaña === 'tutores' ? 'tutores' : 'tutorados';
+      const respuesta = await fetch(`http://localhost:8080/api/datos/${endpoint}`);
+      
+      if (respuesta.ok) {
+        const resultado = await respuesta.json();
+        setDatos(resultado);
+      } else {
+        console.error("Error al obtener datos del servidor");
+        setDatos([]);
+      }
+    } catch (error) {
+      // Evitamos el error de variable no usada imprimiéndola en consola
+      console.error("Fallo de conexión con el Backend:", error);
+      setDatos([]);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  // Recargar cada vez que cambiamos de pestaña
+  useEffect(() => {
+    cargarDatosMaestros();
+  }, [pestaña]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Extraer listas únicas para los filtros (basadas en los datos reales que lleguen)
+  const programasUnicos = [...new Set(datos.map(item => item.programa))];
+  const periodosUnicos = [...new Set(datos.map(item => item.periodo))];
 
   // Lógica de Filtro y Ordenamiento
-  const procesarDatos = (datos) => {
-    return datos
+  const procesarDatos = (lista) => {
+    return lista
       .filter(item => 
-        (item.nombres.toLowerCase().includes(busqueda.toLowerCase()) || 
-         item.apellidos.toLowerCase().includes(busqueda.toLowerCase()) || 
-         item.documento.includes(busqueda)) &&
+        (item.nombres?.toLowerCase().includes(busqueda.toLowerCase()) || 
+         item.apellidos?.toLowerCase().includes(busqueda.toLowerCase()) || 
+         item.documento?.includes(busqueda)) &&
         (filtroPrograma === '' || item.programa === filtroPrograma) &&
         (filtroPeriodo === '' || item.periodo === filtroPeriodo)
       )
@@ -56,7 +74,7 @@ const GestionDatos = () => {
     return <span className="text-[#EBB700] ml-2 font-black text-xs">{ordenAsc ? '↑' : '↓'}</span>;
   };
 
-  const datosFiltrados = procesarDatos(pestaña === 'tutores' ? mockTutores : mockTutorados);
+  const datosFiltrados = procesarDatos(datos);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-7xl mx-auto pb-10 min-h-screen">
@@ -102,7 +120,12 @@ const GestionDatos = () => {
         </div>
 
         {/* TABLA DE DATOS MAESTRA */}
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm relative">
+          {cargando && (
+             <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2631]"></div>
+             </div>
+          )}
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold select-none">
               <tr>
@@ -122,7 +145,6 @@ const GestionDatos = () => {
                   <div className="flex items-center">Periodo {renderIconoOrden('periodo')}</div>
                 </th>
                 
-                {/* Columnas Dinámicas */}
                 {pestaña === 'tutores' ? (
                   <>
                     <th className="p-4">Asignaturas Dadas</th>
@@ -142,10 +164,10 @@ const GestionDatos = () => {
             </thead>
             <tbody className="text-sm divide-y bg-white">
               {datosFiltrados.length === 0 ? (
-                <tr><td colSpan="7" className="p-8 text-center text-gray-500">No se encontraron registros con los filtros actuales.</td></tr>
+                <tr><td colSpan="7" className="p-8 text-center text-gray-500">No se encontraron registros reales en la base de datos.</td></tr>
               ) : (
-                datosFiltrados.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                datosFiltrados.map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50 transition-colors">
                     <td className="p-4 font-semibold text-gray-700">{item.documento}</td>
                     <td className="p-4 font-bold text-[#1B2631]">{item.nombres}</td>
                     <td className="p-4 font-bold text-[#1B2631]">{item.apellidos}</td>
@@ -155,7 +177,7 @@ const GestionDatos = () => {
                     {pestaña === 'tutores' ? (
                       <>
                         <td className="p-4 text-xs font-semibold text-gray-700">{item.asignaturas}</td>
-                        <td className="p-4"><span className={`px-2 py-1 text-[10px] rounded-full font-bold ${item.estado === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.estado}</span></td>
+                        <td className="p-4"><span className={`px-2 py-1 text-[10px] rounded-full font-bold ${item.estado === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.estado || 'ACTIVO'}</span></td>
                       </>
                     ) : (
                       <>

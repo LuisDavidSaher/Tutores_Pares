@@ -7,7 +7,7 @@ import logoUdc from '../assets/Logo_Completo.png';
 import Inicio from './Inicio.jsx';
 import GestionUsuarios from './GestionUsuarios.jsx';
 import GestionDatos from './GestionDatos.jsx';
-import GestionAcademica from './GestionAcademica.jsx'; // <-- EL NUEVO MÓDULO
+import GestionAcademica from './GestionAcademica.jsx';
 import Reportes from './Reportes.jsx';
 import Dashboard from './Dashboard.jsx';
 import Auditorias from './Auditorias.jsx';
@@ -21,7 +21,7 @@ const MainLayout = () => {
   let menuOptions = [];
 
   if (user?.role === 'Administrador') {
-    // El Administrador ve todo el reino (Certificados retirado por orden de UX)
+    // El Administrador ve todo el reino
     menuOptions = [
       'Inicio',
       'Gestión de Usuarios',
@@ -130,12 +130,12 @@ const MainLayout = () => {
           {/* Rutas Restringidas (Solo Administrador) */}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Usuarios' && <GestionUsuarios />}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Datos' && <GestionDatos />}
-          {user?.role === 'Administrador' && activeMenu === 'Gestión Académica' && <GestionAcademica />}
           {user?.role === 'Administrador' && activeMenu === 'Auditorías' && <Auditorias />}
           
           {/* Rutas Compartidas (Admin y Jefe) */}
+          {activeMenu === 'Gestión Académica' && <GestionAcademica usuarioActual={{ rol: user?.role, programa: user?.programa }} />}
           {activeMenu === 'Dashboard Estadísticas' && <Dashboard />}
-          {activeMenu === 'Reportes' && <Reportes />}
+          {activeMenu === 'Reportes' && <Reportes usuarioActual={{ rol: user?.role, programa: user?.programa }} />}
         </div>
 
         {/* --- FOOTER GLOBAL --- */}

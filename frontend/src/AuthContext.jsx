@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
 
 export const AuthContext = createContext();
 
@@ -8,77 +7,65 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const cargarDatosUsuario = async (email) => {
-    try {
-      const { data, error } = await supabase
-        .from('roles_usuarios')
-        .select('rol')
-        .eq('correo', email)
-        .single();
-
-      if (error) throw error;
-
-      const nombreFormateado = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      setUser({
-        name: nombreFormateado,
-        email: email,
-        role: data.rol
-      });
-    } catch (error) {
-      console.error("Error al cargar el rol:", error.message);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // --- REVISIÓN DE SESIÓN LOCAL (SIN SUPABASE) ---
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await cargarDatosUsuario(session.user.email);
-      } else {
-        setLoading(false);
+      // Leemos si hay una sesión guardada en la memoria del navegador
+      const sessionGuardada = localStorage.getItem('sgtp_session');
+      if (sessionGuardada) {
+        setUser(JSON.parse(sessionGuardada));
       }
+      setLoading(false);
     };
     
     checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        cargarDatosUsuario(session.user.email);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- LOGIN CONECTADO A SPRING BOOT ---
   const login = async (email, password) => {
     try {
-      // CORRECCIÓN: Quitamos 'data' para evitar el error de variable sin usar
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Apuntamos al AuthController.java que creamos en Spring Boot
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo: email, password: password })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorMsg = await response.text();
+        throw new Error(errorMsg || "Credenciales incorrectas o usuario no registrado.");
+      }
 
-      await cargarDatosUsuario(email);
+      // Si las credenciales son correctas, Java nos devuelve los datos
+      const data = await response.json();
+
+      const nombreFormateado = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      // Armamos el objeto de sesión exactamente como lo esperaba el resto de su App
+      const userData = {
+        name: nombreFormateado,
+        email: email,
+        role: data.rol, // Mapeamos "rol" de Java a "role" en React
+        programa: data.programa || null 
+      };
+
+      // Guardamos en estado y en el navegador para que no se cierre al recargar
+      setUser(userData);
+      localStorage.setItem('sgtp_session', JSON.stringify(userData));
+
       return { success: true };
 
     } catch (error) {
       console.error("Error de Login:", error.message);
-      return { success: false, message: "Credenciales incorrectas o usuario no registrado." };
+      return { success: false, message: error.message };
     }
   };
 
+  // --- LOGOUT LOCAL ---
   const logout = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
+    // Eliminamos la sesión de la memoria del navegador
+    localStorage.removeItem('sgtp_session');
     setUser(null);
     setLoading(false);
   };

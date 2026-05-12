@@ -1,17 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const Dashboard = () => {
-  // --- MOCK DATA: Simulando métricas del sistema ---
-  const metricas = {
-    tutoresActivos: 45,
-    tutoradosActivos: 120,
-    asignaturas: 18,
-    programas: 6,
-    riesgoAlto: 28,
-    riesgoBajo: 92,
-    reportesCompletados: 14,
-    reportesPendientes: 5
-  };
+  // Estado inicial simulando la estructura esperada para evitar errores en el primer render
+  const [metricas, setMetricas] = useState({
+    tutoresActivos: 0,
+    tutoradosActivos: 0,
+    asignaturas: 0,
+    programas: 0,
+    riesgoAlto: 0,
+    riesgoBajo: 0,
+    reportesCompletados: 0,
+    reportesPendientes: 0
+  });
+
+  // ==========================================
+  // 🔗 CONEXIÓN AL BACKEND
+  // ==========================================
+  useEffect(() => {
+    let montado = true;
+    const cargarMetricas = async () => {
+      try {
+        const respuesta = await fetch('http://localhost:8080/api/dashboard/metricas');
+        if (respuesta.ok && montado) {
+          const datos = await respuesta.json();
+          setMetricas(datos);
+        }
+      } catch (error) {
+        console.error("Error al cargar las métricas del Dashboard:", error);
+      }
+    };
+    cargarMetricas();
+    return () => { montado = false; };
+  }, []);
+
+  // Cálculos dinámicos para las barras de progreso
+  const totalRiesgo = metricas.riesgoBajo + metricas.riesgoAlto;
+  const porcentajeBajo = totalRiesgo > 0 ? Math.round((metricas.riesgoBajo / totalRiesgo) * 100) : 0;
+  const porcentajeAlto = totalRiesgo > 0 ? Math.round((metricas.riesgoAlto / totalRiesgo) * 100) : 0;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-7xl mx-auto pb-10 min-h-screen">
@@ -104,31 +129,31 @@ const Dashboard = () => {
 
             <h4 className="text-lg font-bold text-[#1B2631] mb-4">Métricas de Riesgo (Tutorados)</h4>
             
-            {/* Barras de Progreso Simuladas con CSS */}
+            {/* Barras de Progreso Dinámicas */}
             <div className="space-y-5">
               <div>
                 <div className="flex justify-between text-xs font-bold mb-1">
                   <span className="text-gray-600">Bajo Rendimiento (Riesgo Bajo)</span>
-                  <span className="text-[#1B2631]">{metricas.riesgoBajo} estudiantes</span>
+                  <span className="text-[#1B2631]">{metricas.riesgoBajo} estudiantes ({porcentajeBajo}%)</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div className="bg-[#1B2631] h-2.5 rounded-full" style={{ width: '76%' }}></div>
+                  <div className="bg-[#1B2631] h-2.5 rounded-full transition-all duration-1000" style={{ width: `${porcentajeBajo}%` }}></div>
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-xs font-bold mb-1">
                   <span className="text-gray-600">Alto Riesgo de Deserción</span>
-                  <span className="text-red-600">{metricas.riesgoAlto} estudiantes</span>
+                  <span className="text-red-600">{metricas.riesgoAlto} estudiantes ({porcentajeAlto}%)</span>
                 </div>
                 <div className="w-full bg-red-100 rounded-full h-2.5">
-                  <div className="bg-red-500 h-2.5 rounded-full shadow-sm" style={{ width: '24%' }}></div>
+                  <div className="bg-red-500 h-2.5 rounded-full shadow-sm transition-all duration-1000" style={{ width: `${porcentajeAlto}%` }}></div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Columna Derecha: Guía de Uso (Mantenida del diseño original pero estilizada) */}
+          {/* Columna Derecha: Guía de Uso */}
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <h3 className="text-lg font-bold text-[#1B2631] mb-5 border-b border-gray-100 pb-3 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#EBB700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

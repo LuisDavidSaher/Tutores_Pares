@@ -8,11 +8,16 @@ function App() {
   // 1. Extraemos las funciones de nuestro contexto, incluyendo el estado global de carga
   const { user, login, loading } = useContext(AuthContext);
 
-  // 2. Creamos estados locales para los inputs, errores y carga del formulario
+  // 2. Creamos estados locales para los inputs, errores y carga del formulario de Login
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorLogin, setErrorLogin] = useState('');
   const [estaCargando, setEstaCargando] = useState(false);
+
+  // --- ESTADOS PARA LA ZONA PÚBLICA (DESCARGA DE CERTIFICADOS) ---
+  const [cedulaCertificado, setCedulaCertificado] = useState('');
+  const [cargandoCertificado, setCargandoCertificado] = useState(false);
+  const [mensajeCertificado, setMensajeCertificado] = useState({ tipo: '', texto: '' });
 
   // 3. Función asíncrona que se ejecuta al darle clic a "INICIAR SESIÓN"
   const handleLogin = async (e) => {
@@ -33,7 +38,34 @@ function App() {
     if (!result.success) {
       setErrorLogin(result.message);
       setEstaCargando(false);
+    } else {
+      // PARCHE DE SEGURIDAD
+      setTimeout(() => {
+        setEstaCargando(false);
+        setErrorLogin("Fallo de sincronización. Asegúrese de haber creado la columna 'programa' en su tabla de Supabase.");
+      }, 2000);
     }
+  };
+
+  // --- FUNCIÓN PARA LA ZONA PÚBLICA ---
+  const handleDescargarCertificado = async (e) => {
+    e.preventDefault();
+    if (!cedulaCertificado) return;
+
+    setCargandoCertificado(true);
+    setMensajeCertificado({ tipo: '', texto: '' });
+
+    // Simulación de búsqueda en el Backend (Spring Boot)
+    setTimeout(() => {
+      setCargandoCertificado(false);
+      // Aquí a futuro se hará el fetch real a Java: fetch(`/api/certificados/${cedulaCertificado}`)
+      setMensajeCertificado({ tipo: 'exito', texto: 'Certificado encontrado. Generando PDF...' });
+      alert(`📄 Descargando certificado histórico oficial para la cédula: ${cedulaCertificado}`);
+      setCedulaCertificado('');
+      
+      // Limpiamos el mensaje de éxito después de unos segundos
+      setTimeout(() => setMensajeCertificado({ tipo: '', texto: '' }), 5000);
+    }, 1500);
   };
 
   // --- VISTA DE CARGA INICIAL (Mientras Supabase revisa la sesión) ---
@@ -50,7 +82,7 @@ function App() {
     return <MainLayout />;
   }
 
-  // --- VISTA DE LOGIN (El diseño original impecable) ---
+  // --- VISTA DE LOGIN Y ZONA PÚBLICA ---
   return (
     <div className="min-h-screen flex bg-white">
       {/* Mitad Izquierda: 60% */}
@@ -65,7 +97,7 @@ function App() {
       </div>
 
       {/* Mitad Derecha: Formulario 40% */}
-      <div className="w-full lg:w-1/3 flex items-center justify-center p-8 relative">
+      <div className="w-full lg:w-1/3 flex flex-col justify-center p-8 relative overflow-y-auto">
         
         {/* Spinner superpuesto durante el inicio de sesión */}
         {estaCargando && (
@@ -75,9 +107,9 @@ function App() {
           </div>
         )}
 
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md mx-auto">
           <h2 className="text-4xl font-bold text-gray-900 mb-2">Bienvenido de nuevo</h2>
-          <p className="text-gray-500 mb-8">Inicie sesión en su cuenta</p>
+          <p className="text-gray-500 mb-8">Inicie sesión en su cuenta administrativa</p>
 
           <form className="space-y-6" onSubmit={handleLogin}>
             <div>
@@ -119,22 +151,55 @@ function App() {
             <button 
               type="submit" 
               disabled={estaCargando}
-              className={`w-full text-white py-3 rounded-lg font-semibold transition-colors mt-4 ${estaCargando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1B2631] hover:bg-gray-800'}`}
+              className={`w-full text-white py-3 rounded-lg font-bold tracking-wide transition-colors mt-4 ${estaCargando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1B2631] hover:bg-gray-800'}`}
             >
               INICIAR SESIÓN
             </button>
           </form>
 
-          <div className="mt-8 flex items-center justify-center space-x-4">
-            <span className="h-px w-full bg-gray-200"></span>
-            <span className="text-sm text-gray-500 font-medium whitespace-nowrap">O CONTINUAR CON</span>
-            <span className="h-px w-full bg-gray-200"></span>
+          {/* ==========================================
+              NUEVA ZONA PÚBLICA DE CERTIFICADOS
+          ========================================== */}
+          <div className="mt-10">
+            <div className="flex items-center justify-center space-x-4 mb-6">
+              <span className="h-px w-full bg-gray-200"></span>
+              <span className="text-[10px] text-gray-400 font-bold tracking-widest whitespace-nowrap uppercase">ZONA PÚBLICA (ESTUDIANTES)</span>
+              <span className="h-px w-full bg-gray-200"></span>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm border-t-4 border-t-[#EBB700]">
+              <h3 className="text-sm font-bold text-[#1B2631] mb-1">Descarga tu Certificado</h3>
+              <p className="text-xs text-gray-500 mb-4">Si fuiste Tutor Par y culminaste el proceso exitosamente, ingresa tu documento.</p>
+              
+              <form onSubmit={handleDescargarCertificado} className="flex gap-2">
+                <input 
+                  type="number" 
+                  value={cedulaCertificado}
+                  onChange={(e) => setCedulaCertificado(e.target.value)}
+                  placeholder="No. de Documento" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-[#EBB700] transition-colors bg-white font-medium"
+                  required
+                />
+                <button 
+                  type="submit" 
+                  disabled={cargandoCertificado}
+                  className="bg-[#EBB700] text-[#1B2631] px-5 py-2 rounded-lg font-bold text-sm shadow hover:bg-yellow-500 transition-colors whitespace-nowrap flex items-center disabled:opacity-70"
+                >
+                  {cargandoCertificado ? (
+                    <svg className="animate-spin h-4 w-4 text-[#1B2631]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : 'Descargar'}
+                </button>
+              </form>
+              
+              {mensajeCertificado.texto && (
+                <p className={`mt-3 text-xs font-bold text-center p-2 rounded ${mensajeCertificado.tipo === 'exito' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {mensajeCertificado.texto}
+                </p>
+              )}
+            </div>
           </div>
-          <button className="w-full mt-6 flex items-center justify-center space-x-2 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Logo" className="w-5 h-5" />
-            <span className="font-medium text-gray-700">Sign in with Google</span>
-          </button>
-          <p className="mt-12 text-xs text-gray-500 text-center">
+
+          <p className="mt-10 text-xs text-gray-400 text-center font-medium">
             © 2026 Universidad de Cartagena. Todos los derechos reservados.<br/>
             Sistema de Gestión de Tutoría entre Pares (SGTP)
           </p>

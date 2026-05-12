@@ -1,31 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../AuthContext';
+
+// --- MENSAJERO DE AUDITORÍA ---
+const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
+  try {
+    await fetch('http://localhost:8080/api/auditorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, modulo, accion, detalle, estado })
+    });
+  } catch (error) { 
+    console.error("Fallo Auditoría silenciosa", error); 
+  }
+};
 
 const GestionUsuarios = () => {
+  const { user } = useContext(AuthContext); 
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   
-  // Estados para el Modal de Crear Usuario
+  const [catalogoProgramas, setCatalogoProgramas] = useState([]);
+
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nuevoCorreo, setNuevoCorreo] = useState('');
+  const [nuevaPassword, setNuevaPassword] = useState(''); 
   const [nuevoRol, setNuevoRol] = useState('Jefe de Departamento Académico');
+  const [nuevoPrograma, setNuevoPrograma] = useState(''); 
+  
   const [errorFormulario, setErrorFormulario] = useState('');
   const [guardando, setGuardando] = useState(false);
 
-  // 1. Cargar los usuarios desde Supabase al entrar a la pantalla
   useEffect(() => {
     fetchUsuarios();
+    fetchProgramas();
   }, []);
 
   const fetchUsuarios = async () => {
     setCargando(true);
     try {
-      const { data, error } = await supabase
-        .from('roles_usuarios')
-        .select('*')
-        .order('id', { ascending: true });
-
-      if (error) throw error;
+      const respuesta = await fetch('http://localhost:8080/api/usuarios');
+      if (!respuesta.ok) throw new Error("Error al obtener la lista de usuarios");
+      const data = await respuesta.json();
       setUsuarios(data);
     } catch (error) {
       console.error("Error obteniendo usuarios:", error.message);
@@ -34,47 +49,77 @@ const GestionUsuarios = () => {
     }
   };
 
-  // 2. Función para formatear el nombre basado en el correo
+  const fetchProgramas = async () => {
+    try {
+      const respuesta = await fetch('http://localhost:8080/api/programas');
+      if (respuesta.ok) {
+        const data = await respuesta.json();
+        setCatalogoProgramas(data.map(p => p.nombre));
+      }
+    } catch (error) {
+      console.error("Error al cargar programas de Spring Boot:", error);
+    }
+  };
+
   const formatearNombre = (correo) => {
     return correo.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // 3. Crear un nuevo usuario en la base de datos
   const handleCrearUsuario = async (e) => {
     e.preventDefault();
     setErrorFormulario('');
 
-    // Validación estricta de negocio
     if (!nuevoCorreo.endsWith('@unicartagena.edu.co')) {
       setErrorFormulario('El usuario debe tener un correo institucional válido.');
+      return;
+    }
+    if (nuevaPassword.length < 6) {
+      setErrorFormulario('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (nuevoRol === 'Jefe de Departamento Académico' && !nuevoPrograma) {
+      setErrorFormulario('Debe seleccionar a qué programa pertenece este Jefe de Departamento.');
       return;
     }
 
     setGuardando(true);
     try {
-      // Verificamos si ya existe en la tabla
-      const { data: existente } = await supabase
-        .from('roles_usuarios')
-        .select('correo')
-        .eq('correo', nuevoCorreo)
-        .single();
+      const rolCorto = nuevoRol === 'Administrador' ? 'Administrador' : 'Jefe de Departamento';
+      const programaAsignar = rolCorto === 'Administrador' ? null : nuevoPrograma;
 
-      if (existente) {
-        throw new Error('Este correo ya tiene un rol asignado en el sistema.');
+      const nuevoUsuario = {
+        correo: nuevoCorreo,
+        password: nuevaPassword,
+        rol: rolCorto,
+        programa: programaAsignar
+      };
+
+      const respuesta = await fetch('http://localhost:8080/api/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoUsuario)
+      });
+
+      if (!respuesta.ok) {
+        const errorText = await respuesta.text();
+        throw new Error(errorText || "Error al crear el usuario en el servidor.");
       }
 
-      // Insertamos el nuevo rol en la base de datos
-      const { error } = await supabase
-        .from('roles_usuarios')
-        .insert([{ correo: nuevoCorreo, rol: nuevoRol }]);
+      enviarAuditoria(
+        user?.role || 'Administrador', 
+        "USUARIOS", 
+        "CREACIÓN", 
+        `Creó cuenta para ${nuevoCorreo} con rol ${rolCorto}`
+      );
 
-      if (error) throw error;
-
-      // Éxito: Cerramos modal, limpiamos y recargamos la tabla
       setMostrarModal(false);
       setNuevoCorreo('');
+      setNuevaPassword('');
+      setNuevoPrograma('');
       setNuevoRol('Jefe de Departamento Académico');
       fetchUsuarios();
+      
+      alert(`Usuario ${nuevoCorreo} creado con éxito.`);
       
     } catch (error) {
       setErrorFormulario(error.message);
@@ -83,94 +128,95 @@ const GestionUsuarios = () => {
     }
   };
 
-  // 4. Eliminar un usuario (Revocar acceso)
   const handleEliminarUsuario = async (id, correo) => {
-    const confirmar = window.confirm(`¿Está seguro de revocar el acceso a ${correo}?`);
+    const confirmar = window.confirm(`¿Está seguro de revocar el acceso y eliminar de la BD a ${correo}?`);
     if (!confirmar) return;
 
     try {
-      const { error } = await supabase
-        .from('roles_usuarios')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchUsuarios(); // Recargamos la tabla para que desaparezca
+      const respuesta = await fetch(`http://localhost:8080/api/usuarios/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!respuesta.ok) throw new Error("No se pudo eliminar el usuario");
+      
+      enviarAuditoria(user?.role || 'Administrador', "USUARIOS", "ELIMINACIÓN", `Revocó acceso al usuario ${correo}`, "Alerta");
+      fetchUsuarios(); 
     } catch (error) {
       alert("Error al eliminar usuario: " + error.message);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-6xl mx-auto">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-6xl mx-auto pb-10 min-h-screen">
       
-      {/* Encabezado del Módulo */}
-      <div className="bg-[#1B2631] p-6 text-white flex justify-between items-center">
+      <div className="bg-[#1a232f] p-6 text-white flex justify-between items-center border-b-4 border-[#EBB700] rounded-t-xl">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Usuarios y Roles</h2>
-          <p className="text-sm text-gray-300 mt-1">Administración de accesos al Sistema de Gestión de Tutores Pares.</p>
+          <h2 className="text-2xl font-bold tracking-wide">Gestión de Usuarios y Roles</h2>
+          <p className="text-sm text-gray-400 mt-1 uppercase tracking-widest">Administración de accesos al Sistema SGTP.</p>
         </div>
         <button 
           onClick={() => setMostrarModal(true)}
-          className="bg-[#EBB700] text-[#1B2631] px-6 py-2 rounded-lg font-bold hover:bg-yellow-500 transition-colors shadow-md flex items-center"
+          className="bg-[#EBB700] text-[#1B2631] px-6 py-2.5 rounded-lg font-bold hover:bg-yellow-500 transition-colors shadow flex items-center text-sm"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-          Nuevo Funcionario
+          Nuevo Usuario
         </button>
       </div>
 
-      {/* Tabla de Usuarios */}
-      <div className="p-6">
+      <div className="p-8">
         {cargando ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1B2631]"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500 font-bold">
+              <thead className="bg-[#1B2631] text-white text-[10px] uppercase font-black tracking-widest">
+                <tr>
                   <th className="p-4">Funcionario</th>
                   <th className="p-4">Correo Institucional</th>
                   <th className="p-4">Rol en el Sistema</th>
+                  <th className="p-4">Programa Asignado</th>
                   <th className="p-4 text-center">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 bg-white text-sm">
                 {usuarios.map((usr) => (
                   <tr key={usr.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm mr-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm mr-3 shrink-0">
                           {usr.correo.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-semibold text-gray-800">{formatearNombre(usr.correo)}</span>
+                        <span className="font-black text-[#1B2631] truncate">{formatearNombre(usr.correo)}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-gray-600 text-sm">{usr.correo}</td>
+                    <td className="p-4 font-semibold text-gray-500">{usr.correo}</td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
                         usr.rol === 'Administrador' 
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                          : 'bg-green-100 text-green-700 border border-green-200'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                          : 'bg-green-50 text-green-700 border-green-200'
                       }`}>
                         {usr.rol}
                       </span>
                     </td>
+                    <td className="p-4 font-bold text-gray-600 text-xs">
+                      {usr.programa ? usr.programa : <span className="text-gray-400 italic">Acceso Global</span>}
+                    </td>
                     <td className="p-4 text-center">
                       <button 
                         onClick={() => handleEliminarUsuario(usr.id, usr.correo)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
-                        title="Revocar Acceso"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors font-bold text-xs"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Revocar
                       </button>
                     </td>
                   </tr>
                 ))}
                 {usuarios.length === 0 && (
                   <tr>
-                    <td colSpan="4" className="text-center py-8 text-gray-500">No hay usuarios registrados en la base de datos.</td>
+                    <td colSpan="5" className="text-center p-16 text-gray-500 font-medium bg-gray-50">No hay usuarios registrados.</td>
                   </tr>
                 )}
               </tbody>
@@ -182,52 +228,85 @@ const GestionUsuarios = () => {
       {/* Modal para Crear Usuario */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
-            <div className="bg-[#1B2631] px-6 py-4 flex justify-between items-center text-white">
-              <h3 className="font-bold text-lg">Asignar Nuevo Rol</h3>
-              <button onClick={() => setMostrarModal(false)} className="text-gray-300 hover:text-white font-bold text-xl">&times;</button>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-t-4 border-[#EBB700]">
+            <div className="bg-[#1B2631] px-6 py-5 flex justify-between items-center text-white">
+              <h3 className="font-bold text-lg tracking-wide">Asignar Nuevo Rol</h3>
+              <button onClick={() => setMostrarModal(false)} className="text-gray-300 hover:text-white font-bold text-xl leading-none">&times;</button>
             </div>
             
-            <form onSubmit={handleCrearUsuario} className="p-6 space-y-4">
+            <form onSubmit={handleCrearUsuario} className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Correo Institucional del Funcionario</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Correo Institucional *</label>
                 <input 
                   type="email" 
                   value={nuevoCorreo}
                   onChange={(e) => setNuevoCorreo(e.target.value)}
                   placeholder="ejemplo@unicartagena.edu.co" 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B2631] outline-none transition-all"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1B2631] bg-gray-50 focus:bg-white transition-all"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Contraseña de Acceso *</label>
+                <input 
+                  type="password" 
+                  value={nuevaPassword}
+                  onChange={(e) => setNuevaPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres" 
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1B2631] bg-gray-50 focus:bg-white transition-all"
                   required
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nivel de Acceso (Rol)</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nivel de Acceso (Rol) *</label>
                 <select 
                   value={nuevoRol}
-                  onChange={(e) => setNuevoRol(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B2631] outline-none transition-all"
+                  onChange={(e) => {
+                    setNuevoRol(e.target.value);
+                    if(e.target.value === 'Administrador') setNuevoPrograma('');
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-[#1B2631] outline-none focus:ring-1 focus:ring-[#1B2631] bg-gray-50 focus:bg-white transition-all"
                 >
-                  <option value="Jefe de Departamento Académico">Jefe de Departamento Académico (Lómitado)</option>
+                  <option value="Jefe de Departamento Académico">Jefe de Departamento (Limitado)</option>
                   <option value="Administrador">Administrador (Acceso Total)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-2">
-                  * El Jefe solo puede diligenciar reportes. El Administrador tiene control total del sistema.
-                </p>
               </div>
 
+              {nuevoRol === 'Jefe de Departamento Académico' && (
+                <div className="animate-fade-in bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <label className="block text-[10px] font-bold text-yellow-800 uppercase tracking-widest mb-1">Asignar Programa *</label>
+                  {catalogoProgramas.length === 0 ? (
+                    <span className="text-xs font-bold text-red-500">⚠ No hay programas creados en Gestión Académica.</span>
+                  ) : (
+                    <select 
+                      value={nuevoPrograma}
+                      onChange={(e) => setNuevoPrograma(e.target.value)}
+                      className="w-full px-3 py-2 border border-yellow-300 rounded text-sm outline-none bg-white text-[#1B2631]"
+                      required
+                    >
+                      <option value="">Seleccione Programa...</option>
+                      {catalogoProgramas.map(prog => (
+                        <option key={prog} value={prog}>{prog}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {errorFormulario && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm text-center font-bold">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs text-center font-bold">
                   {errorFormulario}
                 </div>
               )}
 
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setMostrarModal(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors">
+              <div className="pt-2 flex space-x-3">
+                <button type="button" onClick={() => setMostrarModal(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors">
                   Cancelar
                 </button>
-                <button type="submit" disabled={guardando} className={`flex-1 px-4 py-2 text-white rounded-lg font-bold transition-colors flex justify-center items-center ${guardando ? 'bg-gray-400' : 'bg-[#1B2631] hover:bg-gray-800'}`}>
-                  {guardando ? 'Guardando...' : 'Asignar Rol'}
+                <button type="submit" disabled={guardando} className={`flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-bold transition-colors flex justify-center items-center shadow ${guardando ? 'bg-gray-400' : 'bg-[#1B2631] hover:bg-gray-800'}`}>
+                  {guardando ? 'Guardando...' : 'Crear Usuario'}
                 </button>
               </div>
             </form>
