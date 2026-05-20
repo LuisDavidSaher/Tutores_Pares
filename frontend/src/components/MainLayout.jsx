@@ -3,7 +3,7 @@ import { AuthContext } from '../AuthContext';
 import logoCorto from '../assets/Logo_Corto.png';
 import logoUdc from '../assets/Logo_Completo.png';
 
-// Importación de todos los módulos del reino
+// Importación de todos los módulos de la aplicación
 import Inicio from './Inicio.jsx';
 import GestionUsuarios from './GestionUsuarios.jsx';
 import GestionDatos from './GestionDatos.jsx';
@@ -21,7 +21,7 @@ const MainLayout = () => {
   let menuOptions = [];
 
   if (user?.role === 'Administrador') {
-    // El Administrador ve todo el reino
+    // El Administrador ve toda la aplicación sin restricciones
     menuOptions = [
       'Inicio',
       'Gestión de Usuarios',

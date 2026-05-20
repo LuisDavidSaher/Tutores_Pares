@@ -4,16 +4,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/asignaturas")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*") // Asterisco para evitar bloqueos
 public class AsignaturaController {
+
     @Autowired
     private AsignaturaService service;
 
+    // MODIFICADO PARA LA TAREA 3.1: Filtro inteligente
     @GetMapping
-    public List<Asignatura> listar() { return service.obtenerTodas(); }
+    public List<Asignatura> listar(@RequestParam(required = false) String programa) {
+        List<Asignatura> todas = service.obtenerTodas();
+
+        if (programa != null && !programa.isEmpty() && !programa.equals("MULTI-PROGRAMA (ADMIN)")) {
+            return todas.stream()
+                    .filter(a -> a.getProgramas() != null && a.getProgramas().contains(programa))
+                    .collect(Collectors.toList());
+        }
+
+        return todas;
+    }
 
     @PostMapping
     public Asignatura crear(@RequestBody Asignatura a) { return service.guardar(a); }

@@ -14,7 +14,7 @@ const GestionDatos = () => {
   const [ordenCampo, setOrdenCampo] = useState('nombres');
   const [ordenAsc, setOrdenAsc] = useState(true);
 
-  // 🔗 CONEXIÓN AL BACKEND
+  // CONEXIÓN AL BACKEND
   const cargarDatosMaestros = async () => {
     setCargando(true);
     try {
@@ -119,7 +119,7 @@ const GestionDatos = () => {
           </div>
         </div>
 
-        {/* TABLA DE DATOS MAESTRA */}
+        {/* TABLA DE DATOS */}
         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm relative">
           {cargando && (
              <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10">

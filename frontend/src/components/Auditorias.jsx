@@ -5,9 +5,8 @@ const Auditorias = () => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
-  // ==========================================
-  // 🔗 CONEXIÓN AL BACKEND
-  // ==========================================
+  // CONEXIÓN AL BACKEND PARA CARGAR LOS REGISTROS DE AUDITORÍA
+
   const cargarAuditorias = async () => {
     try {
       const respuesta = await fetch('http://localhost:8080/api/auditorias');
@@ -47,7 +46,7 @@ const Auditorias = () => {
   });
 
   const exportarCSV = () => {
-    alert("📥 Exportando logs reales de la base de datos...");
+    alert(" Exportando logs reales de la base de datos...");
   };
 
   return (

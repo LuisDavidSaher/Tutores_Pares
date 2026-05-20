@@ -59,7 +59,7 @@ const Inicio = ({ setActiveMenu }) => {
           </button>
 
           {/* Tarjeta 2: Ir a Gestión (Solo si es Admin) */}
-          {user?.role === 'Administrador' ? (
+          {user?.role === 'Administrador' && (
             <button 
               onClick={() => setActiveMenu('Gestión de Usuarios')} 
               className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-[#EBB700] transition-all text-left group flex flex-col justify-between h-full"
@@ -74,12 +74,6 @@ const Inicio = ({ setActiveMenu }) => {
                 <p className="text-sm text-gray-500 leading-relaxed">Crear o revocar cuentas de Jefes de Departamento en el sistema.</p>
               </div>
             </button>
-          ) : (
-            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-inner text-center flex flex-col items-center justify-center h-full opacity-60">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-               <h3 className="font-bold text-gray-500 mb-1">Módulo Restringido</h3>
-               <p className="text-xs text-gray-400">Acceso exclusivo para el Administrador Global.</p>
-            </div>
           )}
 
           {/* Tarjeta 3: Ir a Estadísticas */}

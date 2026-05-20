@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- REVISIÓN DE SESIÓN LOCAL (SIN SUPABASE) ---
+  // --- REVISIÓN DE SESIÓN LOCAL  ---
   useEffect(() => {
     const checkSession = async () => {
       // Leemos si hay una sesión guardada en la memoria del navegador

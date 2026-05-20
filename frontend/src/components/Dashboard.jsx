@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../AuthContext';
 
 const Dashboard = () => {
-  // Estado inicial simulando la estructura esperada para evitar errores en el primer render
+  // Traemos el contexto para saber si es Admin o Jefe, y de qué programa
+  const { user } = useContext(AuthContext);
+
   const [metricas, setMetricas] = useState({
     tutoresActivos: 0,
     tutoradosActivos: 0,
@@ -10,28 +13,34 @@ const Dashboard = () => {
     riesgoAlto: 0,
     riesgoBajo: 0,
     reportesCompletados: 0,
-    reportesPendientes: 0
+    reportesPendientes: 0,
+    topProgramas: [], 
+    topAsignaturas: [] 
   });
 
-  // ==========================================
-  // 🔗 CONEXIÓN AL BACKEND
-  // ==========================================
+  // CONEXIÓN AL BACKEND
   useEffect(() => {
     let montado = true;
     const cargarMetricas = async () => {
       try {
-        const respuesta = await fetch('http://localhost:8080/api/dashboard/metricas');
+        // Enviamos el programa del usuario como filtro al servidor
+        const paramPrograma = user?.role === 'Administrador' ? 'MULTI-PROGRAMA (ADMIN)' : (user?.programa || '');
+        const url = `http://localhost:8080/api/dashboard/metricas?programa=${encodeURIComponent(paramPrograma)}`;
+
+        const respuesta = await fetch(url);
         if (respuesta.ok && montado) {
           const datos = await respuesta.json();
-          setMetricas(datos);
+          setMetricas(prev => ({ ...prev, ...datos }));
         }
       } catch (error) {
         console.error("Error al cargar las métricas del Dashboard:", error);
       }
     };
-    cargarMetricas();
+    
+    if(user) cargarMetricas();
+    
     return () => { montado = false; };
-  }, []);
+  }, [user]);
 
   // Cálculos dinámicos para las barras de progreso
   const totalRiesgo = metricas.riesgoBajo + metricas.riesgoAlto;
@@ -41,23 +50,19 @@ const Dashboard = () => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-7xl mx-auto pb-10 min-h-screen">
       
-      {/* ==========================================
-          HEADER PRINCIPAL ESTÁNDAR SGTP
-      ========================================= */}
+      {/* HEADER PRINCIPAL */}
       <div className="bg-[#1B2631] p-6 text-white border-b-4 border-[#EBB700] rounded-t-xl flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black tracking-wide">Dashboard de Estadísticas</h2>
           <p className="text-sm text-gray-400 mt-1 uppercase tracking-widest">
-            Visión General del Sistema de Gestión de Tutores Pares
+            {user?.role === 'Administrador' ? 'Visión Global del Sistema' : `Métricas de ${user?.programa}`}
           </p>
         </div>
       </div>
 
       <div className="p-8 animate-fade-in">
         
-        {/* ==========================================
-            TARJETAS DE MÉTRICAS PRINCIPALES (KPIs)
-        ========================================== */}
+        {/* TARJETAS DE MÉTRICAS PRINCIPALES */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#1B2631] hover:shadow-md transition-shadow">
@@ -102,7 +107,7 @@ const Dashboard = () => {
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500 hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Reportes Finalizados</p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Reportes Finales</p>
                 <h3 className="text-4xl font-black text-[#1B2631]">{metricas.reportesCompletados}</h3>
               </div>
               <div className="bg-green-50 p-3 rounded-lg text-green-600">
@@ -114,52 +119,67 @@ const Dashboard = () => {
 
         </div>
 
-        {/* ==========================================
-            SECCIÓN INFERIOR: GRÁFICOS Y DATOS
-        ========================================== */}
+        {/* SECCIÓN INFERIOR: GRÁFICOS Y DATOS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Columna Izquierda: Información General */}
-          <div className="lg:col-span-2 bg-gray-50 p-8 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-xl font-bold text-[#1B2631] mb-4 border-b border-gray-200 pb-3">Información General del Programa</h3>
-            <p className="text-sm font-bold text-[#EBB700] mb-4">Bienvenido al Sistema de Gestión de Tutores.</p>
-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Este aplicativo facilita la administración del programa de retención estudiantil de la Universidad de Cartagena, permitiendo registrar tutores y tutorados, generar reportes y consultar estadísticas de manera centralizada.
-            </p>
-
-            <h4 className="text-lg font-bold text-[#1B2631] mb-4">Métricas de Riesgo (Tutorados)</h4>
-            
-            {/* Barras de Progreso Dinámicas */}
-            <div className="space-y-5">
-              <div>
-                <div className="flex justify-between text-xs font-bold mb-1">
-                  <span className="text-gray-600">Bajo Rendimiento (Riesgo Bajo)</span>
-                  <span className="text-[#1B2631]">{metricas.riesgoBajo} estudiantes ({porcentajeBajo}%)</span>
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-gray-50 p-8 rounded-xl border border-gray-200 shadow-sm">
+              <h4 className="text-lg font-bold text-[#1B2631] mb-4">Métricas de Riesgo Inicial (Tutorados)</h4>
+              <div className="space-y-5">
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-gray-600">Bajo Rendimiento (Riesgo Bajo)</span>
+                    <span className="text-[#1B2631]">{metricas.riesgoBajo} estudiantes ({porcentajeBajo}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="bg-[#1B2631] h-2.5 rounded-full transition-all duration-1000" style={{ width: `${porcentajeBajo}%` }}></div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div className="bg-[#1B2631] h-2.5 rounded-full transition-all duration-1000" style={{ width: `${porcentajeBajo}%` }}></div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-gray-600">Alto Riesgo de Deserción</span>
+                    <span className="text-red-600">{metricas.riesgoAlto} estudiantes ({porcentajeAlto}%)</span>
+                  </div>
+                  <div className="w-full bg-red-100 rounded-full h-2.5">
+                    <div className="bg-red-500 h-2.5 rounded-full shadow-sm transition-all duration-1000" style={{ width: `${porcentajeAlto}%` }}></div>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div>
-                <div className="flex justify-between text-xs font-bold mb-1">
-                  <span className="text-gray-600">Alto Riesgo de Deserción</span>
-                  <span className="text-red-600">{metricas.riesgoAlto} estudiantes ({porcentajeAlto}%)</span>
-                </div>
-                <div className="w-full bg-red-100 rounded-full h-2.5">
-                  <div className="bg-red-500 h-2.5 rounded-full shadow-sm transition-all duration-1000" style={{ width: `${porcentajeAlto}%` }}></div>
-                </div>
+            {/* NUEVOS BLOQUES ESTADÍSTICOS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h4 className="text-sm font-bold text-[#1B2631] mb-4 border-b border-gray-100 pb-2">Programas con más Tutores</h4>
+                <ul className="space-y-3">
+                  {metricas.topProgramas?.length > 0 ? metricas.topProgramas.map((prog, idx) => (
+                    <li key={idx} className="flex justify-between items-center text-sm">
+                      <span className="font-semibold text-gray-700 truncate pr-2">{prog.nombre}</span>
+                      <span className="bg-[#1B2631] text-white px-2 py-1 rounded text-xs font-bold">{prog.cantidad}</span>
+                    </li>
+                  )) : <p className="text-xs text-gray-400 italic">No hay datos suficientes aún.</p>}
+                </ul>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h4 className="text-sm font-bold text-[#1B2631] mb-4 border-b border-gray-100 pb-2">Asignaturas con más Tutorías</h4>
+                <ul className="space-y-3">
+                  {metricas.topAsignaturas?.length > 0 ? metricas.topAsignaturas.map((asig, idx) => (
+                    <li key={idx} className="flex justify-between items-center text-sm">
+                      <span className="font-semibold text-gray-700 truncate pr-2">{asig.nombre}</span>
+                      <span className="bg-[#EBB700] text-[#1B2631] px-2 py-1 rounded text-xs font-bold">{asig.cantidad}</span>
+                    </li>
+                  )) : <p className="text-xs text-gray-400 italic">No hay datos suficientes aún.</p>}
+                </ul>
               </div>
             </div>
           </div>
 
-          {/* Columna Derecha: Guía de Uso */}
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <h3 className="text-lg font-bold text-[#1B2631] mb-5 border-b border-gray-100 pb-3 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#EBB700]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Guía Rápida
             </h3>
-            
             <ul className="space-y-4">
               <li className="flex items-start">
                 <span className="text-[#EBB700] font-black mr-2">✓</span>
@@ -172,21 +192,7 @@ const Dashboard = () => {
                 <span className="text-[#EBB700] font-black mr-2">✓</span>
                 <div>
                   <p className="text-xs font-bold text-[#1B2631]">Reporte Final</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Evalúa el desempeño y cierra las tutorías al finalizar el semestre.</p>
-                </div>
-              </li>
-              <li className="flex items-start">
-                <span className="text-[#EBB700] font-black mr-2">✓</span>
-                <div>
-                  <p className="text-xs font-bold text-[#1B2631]">Consultar Datos</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Accede al histórico de tutores y tutorados mediante filtros.</p>
-                </div>
-              </li>
-              <li className="flex items-start">
-                <span className="text-[#EBB700] font-black mr-2">✓</span>
-                <div>
-                  <p className="text-xs font-bold text-[#1B2631]">Asignaturas</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Alimenta el catálogo de materias para usarlas en los reportes.</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Cierra las tutorías al finalizar el semestre.</p>
                 </div>
               </li>
             </ul>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const limpiarTexto = (texto) => texto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z\s]/g, "");
 
-// --- CUERVO MENSAJERO DE AUDITORÍA ---
+// ENVÍO DE AUDITORÍA
 const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
   try {
     await fetch('http://localhost:8080/api/auditorias', {
@@ -20,7 +20,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   const [pestañaActual, setPestañaActual] = useState(pestañaPorDefecto); 
   const [busqueda, setBusqueda] = useState('');
 
-  // 🛡️ SELLO DE IDENTIDAD COMPLETO PARA AUDITORÍA
+  // SELLO DE IDENTIDAD COMPLETO PARA AUDITORÍA
   const emailReal = usuarioActual.email || (usuarioActual.rol === 'Administrador' ? 'admin.prueba@unicartagena.edu.co' : 'jefe.sistemas@unicartagena.edu.co');
   const programaReal = usuarioActual.programa || 'Sistemas';
   
@@ -40,9 +40,8 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   const [formPrograma, setFormPrograma] = useState({ id: null, nombre: '', facultad: '', campus: '', modalidad: '' });
   const [formAsignatura, setFormAsignatura] = useState({ id: null, codigo: '', nombre: '', facultad: '', programasRelated: [] });
 
-  // ==============================================================
-  // 🔗 CONEXIÓN GLOBAL AL BACKEND
-  // ==============================================================
+
+  // CONEXIÓN GLOBAL AL BACKEND
   const cargarCatalogosDesdeAPI = async () => {
     try {
       if (usuarioActual.rol === 'Administrador') {
@@ -212,7 +211,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
                 <button type="submit" className="bg-[#1B2631] hover:bg-gray-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow">{formCampus.id ? 'Actualizar' : 'Guardar'}</button>
               </div>
             </form>
-            <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4">ID</th><th className="p-4">Nombre del Campus</th><th className="p-4">Municipio</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto">
+            <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4">ID</th><th className="p-4">Nombre del Campus</th><th className="p-4">Municipio/Ciudad</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto">
                 {campus.filter(c => c.nombre.includes(busqueda.toUpperCase())).map((c) => (<tr key={c.id} className="hover:bg-gray-50"><td className="p-4 font-bold text-gray-500">{c.id}</td><td className="p-4 font-black text-[#1B2631]">{c.nombre}</td><td className="p-4 font-medium">{c.municipio}</td><td className="p-4 text-center flex justify-center gap-3"><button onClick={() => {setFormCampus(c); window.scrollTo(0,0);}} className="text-[#1B2631] hover:text-[#EBB700] font-bold text-xs uppercase tracking-tighter">Editar</button><button onClick={() => eliminarCampusReal(c.id)} className="text-red-700 hover:text-red-900 font-bold text-xs uppercase tracking-tighter">Eliminar</button></td></tr>))}
                 {campus.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No hay campus.</td></tr>}
             </tbody></table>

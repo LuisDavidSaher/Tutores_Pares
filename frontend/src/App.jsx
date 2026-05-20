@@ -32,22 +32,21 @@ function App() {
     setEstaCargando(true);
     setErrorLogin(''); 
 
-    // Llamamos a Supabase a través del AuthContext
+    // Llamamos al AuthContext (Que ahora se conecta a Spring Boot)
     const result = await login(email, password);
 
     if (!result.success) {
       setErrorLogin(result.message);
       setEstaCargando(false);
     } else {
-      // PARCHE DE SEGURIDAD
+      // Pequeño retardo visual
       setTimeout(() => {
         setEstaCargando(false);
-        setErrorLogin("Fallo de sincronización. Asegúrese de haber creado la columna 'programa' en su tabla de Supabase.");
-      }, 2000);
+      }, 500);
     }
   };
 
-  // --- FUNCIÓN PARA LA ZONA PÚBLICA ---
+  // --- FUNCIÓN PARA LA ZONA PÚBLICA (CONEXIÓN REAL A SPRING BOOT) ---
   const handleDescargarCertificado = async (e) => {
     e.preventDefault();
     if (!cedulaCertificado) return;
@@ -55,20 +54,43 @@ function App() {
     setCargandoCertificado(true);
     setMensajeCertificado({ tipo: '', texto: '' });
 
-    // Simulación de búsqueda en el Backend (Spring Boot)
-    setTimeout(() => {
-      setCargandoCertificado(false);
-      // Aquí a futuro se hará el fetch real a Java: fetch(`/api/certificados/${cedulaCertificado}`)
-      setMensajeCertificado({ tipo: 'exito', texto: 'Certificado encontrado. Generando PDF...' });
-      alert(`📄 Descargando certificado histórico oficial para la cédula: ${cedulaCertificado}`);
-      setCedulaCertificado('');
+    try {
+      // Hacemos la petición a la puerta que creamos en Java
+      const response = await fetch(`http://localhost:8080/api/certificados/${cedulaCertificado}`);
+
+      if (!response.ok) {
+        throw new Error('Certificado no encontrado. Verifique el número de documento.');
+      }
+
+      // Convertimos la respuesta en un archivo binario (Blob)
+      const blob = await response.blob();
       
-      // Limpiamos el mensaje de éxito después de unos segundos
+      // Creamos un enlace temporal en el navegador para forzar la descarga
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `Certificado_Tutor_${cedulaCertificado}.pdf`; 
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpiamos el enlace temporal
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setMensajeCertificado({ tipo: 'exito', texto: '¡Certificado descargado con éxito!' });
+      setCedulaCertificado('');
+
+    } catch (error) {
+      setMensajeCertificado({ tipo: 'error', texto: error.message });
+    } finally {
+      setCargandoCertificado(false);
+      // Limpiamos el mensaje después de 5 segundos
       setTimeout(() => setMensajeCertificado({ tipo: '', texto: '' }), 5000);
-    }, 1500);
+    }
   };
 
-  // --- VISTA DE CARGA INICIAL (Mientras Supabase revisa la sesión) ---
+  // --- VISTA DE CARGA INICIAL ---
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-[#1B2631]">
@@ -157,9 +179,7 @@ function App() {
             </button>
           </form>
 
-          {/* ==========================================
-              NUEVA ZONA PÚBLICA DE CERTIFICADOS
-          ========================================== */}
+          {/*  NUEVA ZONA PÚBLICA DE CERTIFICADOS */}
           <div className="mt-10">
             <div className="flex items-center justify-center space-x-4 mb-6">
               <span className="h-px w-full bg-gray-200"></span>

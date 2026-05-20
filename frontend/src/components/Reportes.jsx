@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-// --- CUERVO MENSAJERO DE AUDITORÍA ---
+// --- SERVICIO DE AUDITORÍA ---
 const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
   try {
     await fetch('http://localhost:8080/api/auditorias', {
@@ -27,15 +27,13 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   const [filtroReportes, setFiltroReportes] = useState('');
   const [filtroTutorias, setFiltroTutorias] = useState('');
 
-// 🛡️ SELLO DE IDENTIDAD COMPLETO PARA AUDITORÍA
   const emailReal = usuarioActual.email || (usuarioActual.rol === 'Administrador' ? 'admin.prueba@unicartagena.edu.co' : 'jefe.sistemas@unicartagena.edu.co');
   const programaReal = usuarioActual.programa || 'Sistemas';
   
-  // Fusionamos Rol, Programa y Correo. Mantenemos el nombre de la variable "correoUsuario" 
-  // para no tener que cambiar nada en el resto del código abajo.
   const correoUsuario = usuarioActual.rol === 'Administrador' 
     ? `Administrador Global (${emailReal})` 
     : `Jefe de ${programaReal} (${emailReal})`;
+
   // --- CATÁLOGOS ---
   const [catalogoFacultades, setCatalogoFacultades] = useState([]);
   const [catalogoCampus, setCatalogoCampus] = useState([]);
@@ -70,16 +68,15 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   const [tutoradoEnEdicion, setTutoradoEnEdicion] = useState(null); 
   const [datosEdicion, setDatosEdicion] = useState({});
 
-  // ==========================================
-  // 🔗 CONEXIÓN A SPRING BOOT (CATÁLOGOS Y REPORTES)
-  // ==========================================
+
+  // CONEXIÓN A SPRING BOOT (CATÁLOGOS Y REPORTES)
   const cargarDatosDesdeAPI = async () => {
     try {
       const [resCampus, resFacultades, resProgramas, resAsignaturas, resReportes] = await Promise.all([
         fetch('http://localhost:8080/api/campus'),
         fetch('http://localhost:8080/api/facultades'),
         fetch('http://localhost:8080/api/programas'),
-        fetch('http://localhost:8080/api/asignaturas'),
+        fetch(`http://localhost:8080/api/asignaturas?programa=${encodeURIComponent(usuarioActual.rol === 'Administrador' ? 'MULTI-PROGRAMA (ADMIN)' : usuarioActual.programa)}`),
         fetch('http://localhost:8080/api/reportes') 
       ]);
 
@@ -123,11 +120,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setReporteACompletar(reporte); setFiltroTutorFase2(''); setTutoriasExpandidasFase2([]); setVistaActual('pantalla4');
   };
 
-  const simularDescargaPDF = (idReporte = "Borrador") => { 
-    alert(`📄 Generando PDF para el reporte [${idReporte}]...`); 
-    enviarAuditoria(correoUsuario, "REPORTES", "EXPORTACIÓN", `Descargó el PDF del reporte ${idReporte}`);
-  };
-
   const toggleExpandirTutoriaFase2 = (id) => {
     if (tutoriasExpandidasFase2.includes(id)) { setTutoriasExpandidasFase2(tutoriasExpandidasFase2.filter(tId => tId !== id)); } 
     else { setTutoriasExpandidasFase2([...tutoriasExpandidasFase2, id]); }
@@ -168,10 +160,15 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setTutoriasBorrador(nuevasTutorias);
   };
 
-  // ==============================================================
-  // 🔗 MAGIA DEL BACKEND: GESTIÓN DE ESTUDIANTES (TUTOR Y TUTORADO)
-  // ==============================================================
-  
+  // NUEVO: Eliminar una tutoría completa en la Pantalla 2
+  const eliminarTutoriaBorrador = (tutoriaId) => {
+    if (window.confirm("¿Está seguro de eliminar esta tutoría completa? Todos los tutorados asociados se perderán.")) {
+      setTutoriasBorrador(tutoriasBorrador.filter(t => t.id !== tutoriaId));
+      if (tutoriaExpandida === tutoriaId) setTutoriaExpandida(null);
+    }
+  };
+
+  // GESTIÓN DE ESTUDIANTES (TUTOR Y TUTORADO)
   const buscarTutor = async () => {
     if (!tutorDoc) { alert("Ingrese un documento para buscar."); return; }
     
@@ -292,7 +289,21 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
   const agruparTutoria = (e) => {
     e.preventDefault();
-    if (!tutorConfirmado || !formAsignatura) { alert("Faltan confirmar el tutor o seleccionar asignatura."); return; }
+    if (!tutorConfirmado || !formAsignatura) { 
+      alert("Faltan confirmar el tutor o seleccionar asignatura."); 
+      return; 
+    }
+
+    //  Evita agrupar si el usuario presionó Enter antes de agregar tutorados
+    if (tutorados.length === 0) {
+      alert("Error: Debe agregar al menos un tutorado a la lista antes de agrupar esta tutoría.");
+      return;
+    }
+
+    if (!catalogoAsignaturas.includes(formAsignatura)) {
+      alert("Error: Debe seleccionar una asignatura válida del catálogo desplegable.");
+      return;
+    }
 
     const indexExistente = tutoriasBorrador.findIndex(tut => tut.tutorDoc === tutorDoc && tut.asignatura === formAsignatura);
 
@@ -305,7 +316,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       alert("Tutor y Asignatura ya registrados. Se han añadido los tutorados a la tutoría existente.");
     } else {
       setTutoriasBorrador([...tutoriasBorrador, {
-        id: `TUT-${Math.floor(Math.random() * 9000)}`, tutorDoc: tutorDoc, asignatura: formAsignatura, tutorNombre: `${tutorDatos.nombres} ${tutorDatos.apellidos}`, numeroTutorados: tutorados.length, tutoradosList: tutorados
+        id: `Borrador-${tutoriasBorrador.length + 1}`, tutorDoc: tutorDoc, asignatura: formAsignatura, tutorNombre: `${tutorDatos.nombres} ${tutorDatos.apellidos}`, numeroTutorados: tutorados.length, tutoradosList: tutorados
       }]);
     }
     
@@ -315,16 +326,14 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setVistaActual('pantalla2');
   };
 
-  // ==============================================================
-  // 🔗 NUEVO: GUARDAR REPORTE EN SPRING BOOT
-  // ==============================================================
+  // GUARDAR REPORTE EN SPRING BOOT
   const guardarReporteInicial = async () => {
     if (tutoriasBorrador.length === 0) return;
 
     const programaVinculado = usuarioActual.rol === 'Jefe de Departamento' ? usuarioActual.programa : 'MULTI-PROGRAMA (ADMIN)';
     
     const nuevoReporte = {
-      id: `REP-${Math.floor(Math.random() * 9000)}`, 
+      id: `REP-TEMP`, 
       periodo: formPeriodo, 
       programaReporte: programaVinculado, 
       estado: 'Inicial', 
@@ -340,7 +349,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
       if (respuesta.ok) {
         alert(`Nuevo reporte inicial generado y guardado en la Base de Datos.`);
-        enviarAuditoria(correoUsuario, "REPORTES", "CREACIÓN", `Guardó el Reporte Inicial (${nuevoReporte.id}) en la Base de Datos`);
+        enviarAuditoria(correoUsuario, "REPORTES", "CREACIÓN", `Guardó el Reporte Inicial en la Base de Datos`);
         setTutoriasBorrador([]);
         volverAListado();
       } else {
@@ -352,9 +361,35 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     }
   };
 
-  // ==============================================================
-  // 🔗 NUEVO: ACTUALIZAR ESTADO A "FINAL" EN SPRING BOOT
-  // ==============================================================
+  // MANEJO DE ESTADO PARA EVALUACIÓN FINAL
+  const handleDictamenChange = (tutoriaId, valor) => {
+    setReporteACompletar(prev => {
+      if (!prev) return prev;
+      const nuevasTutorias = prev.tutorias.map(tut =>
+        tut.id === tutoriaId ? { ...tut, dictamen: valor } : tut
+      );
+      return { ...prev, tutorias: nuevasTutorias };
+    });
+  };
+
+  const handleEvaluacionChange = (tutoriaId, tutoradoIdx, campo, valor) => {
+    setReporteACompletar(prev => {
+      if (!prev) return prev;
+      const nuevasTutorias = prev.tutorias.map(tut => {
+        if (tut.id === tutoriaId) {
+          const nuevosTutorados = [...tut.tutoradosList];
+          nuevosTutorados[tutoradoIdx] = {
+            ...nuevosTutorados[tutoradoIdx],
+            [campo]: valor
+          };
+          return { ...tut, tutoradosList: nuevosTutorados };
+        }
+        return tut;
+      });
+      return { ...prev, tutorias: nuevasTutorias };
+    });
+  };
+
   const procesarReporteFinal = async (e) => {
     e.preventDefault();
     try {
@@ -365,7 +400,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       });
 
       if (respuesta.ok) {
-        alert("¡Reporte Finalizado y actualizado en la Base de Datos!");
+        alert("Reporte Finalizado y actualizado en la Base de Datos.");
         enviarAuditoria(correoUsuario, "REPORTES", "EDICIÓN", `Cerró con éxito el Reporte Final ${reporteACompletar.id}`);
         volverAListado();
       }
@@ -402,9 +437,8 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
       <div className="p-8">
         
-        {/* ==========================================
-            PANTALLA 1: LISTADO DE REPORTES
-        ========================================== */}
+        {/*   PANTALLA 1: LISTADO DE REPORTES */}
+
         {vistaActual === 'pantalla1' && (
           <div className="animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-100 pb-6 gap-4">
@@ -435,12 +469,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                             Cerrar (Pasar a Final)
                           </button>
                       ) : (
-                          <>
-                            <span className="text-gray-500 font-semibold text-xs italic px-2">Completado</span>
-                            <button onClick={() => simularDescargaPDF(rep.id)} className="px-3 py-1.5 rounded border text-xs font-bold bg-red-50 text-red-600 border-red-200 hover:bg-red-100 transition-all shadow-sm flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> PDF
-                            </button>
-                          </>
+                          <span className="text-gray-500 font-semibold text-xs italic px-2">Completado</span>
                       )}
                     </td>
                   </tr>
@@ -451,9 +480,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
           </div>
         )}
 
-        {/* ==========================================
-            PANTALLA 2: LISTADO DE TUTORÍAS
-        ========================================= */}
+        {/* PANTALLA 2: LISTADO DE TUTORÍAS */}
         {vistaActual === 'pantalla2' && (
           <div className="animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-100 pb-6 gap-4">
@@ -484,9 +511,12 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                           <td className="p-4 font-medium text-gray-800">{tut.tutorNombre}</td>
                           <td className="p-4 text-gray-600">{tut.asignatura}</td>
                           <td className="p-4 text-center font-black text-[#1B2631] text-lg">{tut.numeroTutorados}</td>
-                          <td className="p-4 text-center">
+                          <td className="p-4 text-center space-x-3">
                             <button onClick={() => toggleExpandirTutoria(tut.id)} className="text-[#EBB700] hover:text-yellow-600 font-bold text-sm underline">
                               {tutoriaExpandida === tut.id ? 'Ocultar' : 'Ver Detalles'}
+                            </button>
+                            <button onClick={() => eliminarTutoriaBorrador(tut.id)} className="text-red-500 hover:text-red-700 font-bold text-sm underline">
+                              Eliminar
                             </button>
                           </td>
                         </tr>
@@ -563,9 +593,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
             {tutoriasBorrador.length > 0 && (
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                <button type="button" onClick={() => simularDescargaPDF("Borrador_Fase1")} className="px-6 py-3 bg-red-50 text-red-700 border border-red-200 font-bold rounded-lg hover:bg-red-100 transition shadow-sm flex items-center text-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Exportar a PDF
-                </button>
                 <button onClick={guardarReporteInicial} className="bg-[#1B2631] text-white px-8 py-3 rounded-lg font-bold shadow-sm flex items-center text-sm hover:bg-gray-800 transition">
                   Guardar y Generar Reporte Inicial
                 </button>
@@ -574,9 +601,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
           </div>
         )}
 
-        {/* ==========================================
-            PANTALLA 3: FORMULARIO FASE 1
-        ========================================== */}
+        {/* PANTALLA 3: FORMULARIO FASE 1 */}
         {vistaActual === 'pantalla3' && (
           <form onSubmit={agruparTutoria} className="animate-fade-in max-w-6xl mx-auto space-y-6">
             <div className="text-center mb-6"><h3 className="text-2xl font-bold text-[#1B2631]">Estructurar Nueva Tutoría (Fase 1)</h3></div>
@@ -584,14 +609,24 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
             <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Asignatura (Catálogo)</label>
-                  <select value={formAsignatura} onChange={(e) => setFormAsignatura(e.target.value)} className="w-full px-4 py-2.5 border rounded font-medium outline-none bg-white text-sm focus:border-[#1B2631]" required disabled={tutorConfirmado}>
-                    <option value="">Seleccionar...</option>{catalogoAsignaturas.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Asignatura (Búsqueda Inteligente)</label>
+                  <input 
+                    type="text" 
+                    list="asignaturas-list"
+                    value={formAsignatura} 
+                    onChange={(e) => setFormAsignatura(e.target.value)} 
+                    placeholder="Escriba para buscar o seleccione..."
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg font-medium outline-none bg-white text-sm focus:border-[#1B2631] focus:ring-1 focus:ring-[#1B2631]" 
+                    required 
+                    disabled={tutorConfirmado} 
+                  />
+                  <datalist id="asignaturas-list">
+                    {catalogoAsignaturas.map(a => <option key={a} value={a} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Periodo Académico Actual</label>
-                  <select value={formPeriodo} onChange={(e) => setFormPeriodo(e.target.value)} className="w-full px-4 py-2.5 border rounded font-medium outline-none bg-white text-sm focus:border-[#1B2631]" required disabled={tutorConfirmado}>
+                  <select value={formPeriodo} onChange={(e) => setFormPeriodo(e.target.value)} className="w-full px-4 py-2.5 border rounded-lg font-medium outline-none bg-white text-sm focus:border-[#1B2631]" required disabled={tutorConfirmado}>
                     <option value="2026-I">2026-I</option>
                   </select>
                 </div>
@@ -645,14 +680,14 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-widest mb-1">Nota Histórica en Asignatura ({formAsignatura || '...'})</label>
-                  <input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} value={tutorDatos.notaAsignatura} onChange={(e) => setTutorDatos({...tutorDatos, notaAsignatura: e.target.value})} placeholder="Ej: 4.0" className="w-full px-3 py-2 border border-gray-300 rounded font-bold text-sm bg-white text-[#1B2631] focus:border-[#1B2631]" disabled={tutorConfirmado || !formAsignatura} required/>
+                  <input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} value={tutorDatos.notaAsignatura} onChange={(e) => setTutorDatos({...tutorDatos, notaAsignatura: e.target.value})} placeholder="Ej: 4.0" className="w-full px-3 py-2 border border-gray-300 rounded font-bold text-sm bg-white text-[#1B2631]" disabled={tutorConfirmado || !formAsignatura} required/>
                 </div>
               </div>
 
               {!tutorConfirmado ? (
                 <button type="button" onClick={confirmarTutor} className="mt-5 bg-[#1B2631] text-white px-6 py-2 rounded-lg font-semibold text-sm hover:bg-gray-800 transition shadow">Confirmar y Agregar Tutor Par</button>
               ) : (
-                <div className="mt-5 text-[#1B2631] font-semibold text-xs bg-gray-100 p-3 rounded border border-gray-300 flex justify-between items-center"><span>✅ Tutor Confirmado.</span> <button type="button" onClick={() => setTutorConfirmado(false)} className="underline font-bold">Editar Tutor</button></div>
+                <div className="mt-5 text-[#1B2631] font-semibold text-xs bg-gray-100 p-3 rounded border border-gray-300 flex justify-between items-center"><span> Tutor Confirmado.</span> <button type="button" onClick={() => setTutorConfirmado(false)} className="underline font-bold">Editar Tutor</button></div>
               )}
             </div>
 
@@ -689,7 +724,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                     <div className="col-span-2 md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Riesgo Inicial</label><select value={tutoradoDraft.riesgo} onChange={(e) => setTutoradoDraft({...tutoradoDraft, riesgo: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs bg-white focus:border-[#1B2631] font-bold text-yellow-700"><option value="">SELECCIONE...</option><option value="BAJO">BAJO RENDIMIENTO</option><option value="ALTO">ALTO RIESGO</option></select></div>
                     <div className="col-span-2 md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Prom. Inicial</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} value={tutoradoDraft.promedioInicio} onChange={(e) => setTutoradoDraft({...tutoradoDraft, promedioInicio: e.target.value})} className="w-full border border-gray-300 px-3 py-2 rounded text-xs font-bold focus:border-[#1B2631]" /></div>
                   </div>
-                  <button type="button" onClick={agregarTutorado} className="bg-gray-200 text-gray-800 border border-gray-300 px-4 py-2 rounded-lg text-xs font-bold w-full hover:bg-gray-300 transition">Añadir Tutorado a la Lista ↑</button>
+                  <button type="button" onClick={agregarTutorado} className="bg-gray-200 text-gray-800 border border-gray-300 px-4 py-2 rounded-lg text-xs font-bold w-full hover:bg-gray-300 transition">Añadir Tutorado a la Lista</button>
                 </div>
               </div>
             )}
@@ -731,7 +766,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                        
                        <div className="flex items-center gap-2 bg-yellow-50 px-3 py-1.5 rounded-lg border border-[#EBB700] w-full md:w-auto justify-between">
                           <label className="text-[10px] font-bold text-gray-800 uppercase tracking-wider m-0">Dictamen:</label>
-                          <select className="font-bold outline-none bg-transparent text-[#1B2631] text-xs border-b border-[#EBB700] m-0" required>
+                          <select value={tutoria.dictamen || ''} onChange={(e) => handleDictamenChange(tutoria.id, e.target.value)} className="font-bold outline-none bg-transparent text-[#1B2631] text-xs border-b border-[#EBB700] m-0" required>
                              <option value="">Seleccione...</option><option value="SI">CUMPLIÓ</option><option value="NO">NO CUMPLIÓ</option>
                           </select>
                        </div>
@@ -746,17 +781,17 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                                    <p className="font-bold text-gray-800 mb-4 text-sm">{tutorado.nombres} {tutorado.apellidos} <span className="text-gray-500 font-normal text-xs ml-1">(ID: {tutorado.documento})</span></p>
                                    
                                    <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-4">
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Inicio</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Fin</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tot. Sesiones</label><input type="number" min="0" placeholder="Ej: 12" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nota Final (Materia)</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.5" className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none font-bold bg-white focus:border-[#1B2631]" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Prom. Acum. Final</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.2" className="w-full px-3 py-2 border border-yellow-300 rounded text-xs outline-none font-bold text-yellow-700 bg-yellow-50 focus:border-[#EBB700]" required /></div>
-                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">¿Cargado SIRE?</label><select className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required><option value="">...</option><option value="SI">SÍ</option><option value="NO">NO</option></select></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Inicio</label><input type="date" value={tutorado.fechaInicio || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'fechaInicio', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Fin</label><input type="date" value={tutorado.fechaFin || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'fechaFin', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tot. Sesiones</label><input type="number" min="0" placeholder="Ej: 12" value={tutorado.totalSesiones || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'totalSesiones', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nota Final (Materia)</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.5" value={tutorado.notaFinal || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'notaFinal', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none font-bold bg-white focus:border-[#1B2631]" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Prom. Acum. Final</label><input type="number" step="0.1" min="0.0" onKeyDown={prevenirComa} placeholder="Ej: 4.2" value={tutorado.promAcumFinal || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'promAcumFinal', e.target.value)} className="w-full px-3 py-2 border border-yellow-300 rounded text-xs outline-none font-bold text-yellow-700 bg-yellow-50 focus:border-[#EBB700]" required /></div>
+                                      <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">¿Cargado SIRE?</label><select value={tutorado.cargadoSire || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'cargadoSire', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white" required><option value="">...</option><option value="SI">SÍ</option><option value="NO">NO</option></select></div>
                                    </div>
 
                                    <div className="mt-4">
                                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Observaciones / Novedades del proceso</label>
-                                      <textarea rows="2" placeholder="Detalle aquí cualquier novedad extensa sobre el proceso del tutorado..." className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white focus:border-[#1B2631] resize-y"></textarea>
+                                      <textarea rows="2" placeholder="Detalle aquí cualquier novedad extensa sobre el proceso del tutorado..." value={tutorado.observaciones || ''} onChange={(e) => handleEvaluacionChange(tutoria.id, idxTutorado, 'observaciones', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded text-xs outline-none bg-white focus:border-[#1B2631] resize-y"></textarea>
                                    </div>
                                 </div>
                              ))}
@@ -768,9 +803,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
               <div className="flex gap-4 justify-end border-t border-gray-200 pt-6 mt-8">
                  <button type="button" onClick={volverAListado} className="px-6 py-2.5 bg-gray-100 font-bold text-sm rounded-lg hover:bg-gray-200 transition text-gray-700 border border-gray-300">Cancelar Cierre</button>
-                 <button type="button" onClick={() => simularDescargaPDF(reporteACompletar.id)} className="px-6 py-2.5 bg-red-50 text-red-700 font-bold text-sm border border-red-200 rounded-lg hover:bg-red-100 transition flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Exportar PDF
-                 </button>
                  <button type="submit" className="bg-[#1B2631] text-white px-8 py-2.5 font-bold text-sm rounded-lg hover:bg-gray-800 shadow-sm flex items-center transition">
                     Completar y Guardar Reporte Final
                  </button>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../AuthContext';
 
-// --- MENSAJERO DE AUDITORÍA ---
+// --- ENVÍO DE AUDITORÍA ---
 const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
   try {
     await fetch('http://localhost:8080/api/auditorias', {
