@@ -20,15 +20,7 @@ public class DataSeeder {
                 admin.setRol("Administrador");
                 repository.save(admin);
 
-                // 2. Crear el Jefe de Sistemas
-                Usuario jefe = new Usuario();
-                jefe.setCorreo("jefe.sistemas@unicartagena.edu.co");
-                jefe.setPassword("123456"); // Contraseña por defecto
-                jefe.setRol("Jefe de Departamento");
-                jefe.setPrograma("INGENIERÍA DE SISTEMAS");
-                repository.save(jefe);
-
-                System.out.println("🛡️ Cuentas de Admin y Jefe sembradas con éxito en la BD.");
+                System.out.println("️ Cuentas de Admin sembradas con éxito en la BD.");
             }
         };
     }

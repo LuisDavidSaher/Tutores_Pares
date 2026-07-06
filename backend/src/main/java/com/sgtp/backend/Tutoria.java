@@ -15,6 +15,7 @@ public class Tutoria {
     private String tutorNombre;
     private String asignatura;
     private Integer numeroTutorados;
+    private String dictamen;
 
     // Aquí está la magia: Una Tutoría tiene MUCHOS Tutorados
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
@@ -36,4 +37,6 @@ public class Tutoria {
     public void setNumeroTutorados(Integer numeroTutorados) { this.numeroTutorados = numeroTutorados; }
     public List<TutoradoDetalle> getTutoradosList() { return tutoradosList; }
     public void setTutoradosList(List<TutoradoDetalle> tutoradosList) { this.tutoradosList = tutoradosList; }
+    public String getDictamen() { return dictamen;}
+    public void setDictamen(String dictamen) { this.dictamen = dictamen; }
 }

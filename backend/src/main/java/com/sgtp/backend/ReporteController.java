@@ -8,7 +8,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reportes")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*")
 public class ReporteController {
 
     @Autowired
@@ -26,7 +26,19 @@ public class ReporteController {
         return service.guardar(reporte);
     }
 
-    // PUT: React avisa que el reporte se cerró y pasa a estado "Final"
+    // NUEVO: PUT PROFUNDO. Recibe el reporte completo con las notas actualizadas y lo sobreescribe en cascada
+    @PutMapping("/{id}")
+    public ResponseEntity<Reporte> actualizarReporteCompleto(@PathVariable String id, @RequestBody Reporte reporteActualizado) {
+        try {
+            reporteActualizado.setId(id); // Blindaje de seguridad para asegurar la sobreescritura correcta
+            return ResponseEntity.ok(service.guardar(reporteActualizado));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // PUT: Mantenido por compatibilidad histórica para cambios de estado superficiales
     @PutMapping("/{id}/estado")
     public ResponseEntity<Reporte> cambiarEstado(@PathVariable String id, @RequestBody Map<String, String> body) {
         try {

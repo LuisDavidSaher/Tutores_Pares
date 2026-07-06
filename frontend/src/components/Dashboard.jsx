@@ -148,12 +148,14 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* NUEVOS BLOQUES ESTADÍSTICOS */}
+            {/* NUEVOS BLOQUES ESTADÍSTICOS CON TOP 10 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h4 className="text-sm font-bold text-[#1B2631] mb-4 border-b border-gray-100 pb-2">Programas con más Tutores</h4>
+                <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                   <h4 className="text-sm font-bold text-[#1B2631]">Top Programas (Tutores)</h4>
+                </div>
                 <ul className="space-y-3">
-                  {metricas.topProgramas?.length > 0 ? metricas.topProgramas.map((prog, idx) => (
+                  {metricas.topProgramas?.length > 0 ? metricas.topProgramas.slice(0, 5).map((prog, idx) => (
                     <li key={idx} className="flex justify-between items-center text-sm">
                       <span className="font-semibold text-gray-700 truncate pr-2">{prog.nombre}</span>
                       <span className="bg-[#1B2631] text-white px-2 py-1 rounded text-xs font-bold">{prog.cantidad}</span>
@@ -163,9 +165,11 @@ const Dashboard = () => {
               </div>
 
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h4 className="text-sm font-bold text-[#1B2631] mb-4 border-b border-gray-100 pb-2">Asignaturas con más Tutorías</h4>
+                <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                   <h4 className="text-sm font-bold text-[#1B2631]">Top Asignaturas (Tutorías)</h4>
+                </div>
                 <ul className="space-y-3">
-                  {metricas.topAsignaturas?.length > 0 ? metricas.topAsignaturas.map((asig, idx) => (
+                  {metricas.topAsignaturas?.length > 0 ? metricas.topAsignaturas.slice(0, 5).map((asig, idx) => (
                     <li key={idx} className="flex justify-between items-center text-sm">
                       <span className="font-semibold text-gray-700 truncate pr-2">{asig.nombre}</span>
                       <span className="bg-[#EBB700] text-[#1B2631] px-2 py-1 rounded text-xs font-bold">{asig.cantidad}</span>

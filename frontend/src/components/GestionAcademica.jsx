@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const limpiarTexto = (texto) => texto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z\s]/g, "");
+const limpiarTexto = (texto) => texto ? texto.toString().toUpperCase().trim() : "";
 
 // ENVÍO DE AUDITORÍA
 const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
@@ -26,7 +26,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   
   const correoUsuario = usuarioActual.rol === 'Administrador' 
     ? `Administrador Global (${emailReal})` 
-    : `Jefe de ${programaReal} (${emailReal})`;
+    : `Jefe de ${programaReal.toUpperCase()} (${emailReal})`;
     
   // ESTADOS 100% CONECTADOS A DB
   const [campus, setCampus] = useState([]); 
@@ -34,7 +34,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   const [programas, setProgramas] = useState([]);
   const [asignaturas, setAsignaturas] = useState([]);
 
-  // FORMULARIOS CON IDs (Añadido 'modalidad' a formPrograma)
+  // FORMULARIOS CON IDs
   const [formCampus, setFormCampus] = useState({ id: null, nombre: '', municipio: '' });
   const [formFacultad, setFormFacultad] = useState({ id: null, nombre: '', campus: '' }); 
   const [formPrograma, setFormPrograma] = useState({ id: null, nombre: '', facultad: '', campus: '', modalidad: '' });
@@ -84,7 +84,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   };
 
   const eliminarCampusReal = async (id) => {
-    if(!window.confirm(`¿Seguro?`)) return;
+    if(!window.confirm(`¿Está seguro de proceder con la eliminación?`)) return;
     const res = await fetch(`http://localhost:8080/api/campus/${id}`, { method: 'DELETE' });
     if(res.ok) {
         cargarCatalogosDesdeAPI();
@@ -110,7 +110,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   };
 
   const eliminarFacultadReal = async (id) => {
-    if(!window.confirm(`¿Seguro?`)) return;
+    if(!window.confirm(`¿Está seguro de proceder con la eliminación?`)) return;
     const res = await fetch(`http://localhost:8080/api/facultades/${id}`, { method: 'DELETE' });
     if(res.ok) {
         cargarCatalogosDesdeAPI();
@@ -136,7 +136,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   };
 
   const eliminarProgramaReal = async (id) => {
-    if(!window.confirm(`¿Seguro?`)) return;
+    if(!window.confirm(`¿Está seguro de proceder con la eliminación?`)) return;
     const res = await fetch(`http://localhost:8080/api/programas/${id}`, { method: 'DELETE' });
     if(res.ok) {
         cargarCatalogosDesdeAPI();
@@ -160,7 +160,7 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
   };
 
   const eliminarAsignaturaReal = async (id) => {
-    if(!window.confirm(`¿Seguro?`)) return;
+    if(!window.confirm(`¿Está seguro de proceder con la eliminación?`)) return;
     const res = await fetch(`http://localhost:8080/api/asignaturas/${id}`, { method: 'DELETE' });
     if(res.ok) {
         cargarCatalogosDesdeAPI();
@@ -193,27 +193,27 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
       </div>
 
       <div className="p-8 animate-fade-in relative z-0">
-        <div className="mb-6"><input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={`Buscar en ${pestañaActual.toUpperCase()}...`} className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1B2631] bg-gray-50 focus:bg-white transition-colors" /></div>
+        <div className="mb-6"><input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value.toUpperCase())} placeholder={`BUSCAR EN ${pestañaActual.toUpperCase()}...`} className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1B2631] bg-gray-50 focus:bg-white transition-colors" /></div>
 
         {/* --- VISTA: CAMPUS --- */}
         {pestañaActual === 'campus' && (
           <div>
             <form onSubmit={guardarOActualizarCampus} className={`bg-gray-50 p-6 rounded-xl border border-gray-200 border-t-4 mb-8 shadow-sm transition-colors duration-300 ${formCampus.id ? 'border-t-[#EBB700] bg-amber-50/30' : 'border-t-[#EBB700]'}`}>
               <div className="flex justify-between items-center mb-5">
-                <h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formCampus.id ? 'Editar Campus' : 'Registrar Nuevo Campus'}</h4>
+                <h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formCampus.id ? 'EDITAR CAMPUS' : 'REGISTRAR NUEVO CAMPUS'}</h4>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
-                <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre del Campus *</label><input type="text" value={formCampus.nombre} onChange={(e) => setFormCampus({...formCampus, nombre: e.target.value})} placeholder="Ej: ZARAGOCILLA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
-                <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Municipio / Ciudad *</label><input type="text" value={formCampus.municipio} onChange={(e) => setFormCampus({...formCampus, municipio: e.target.value})} placeholder="Ej: CARTAGENA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
+                <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre del Campus *</label><input type="text" value={formCampus.nombre} onChange={(e) => setFormCampus({...formCampus, nombre: e.target.value.toUpperCase()})} placeholder="EJ: ZARAGOCILLA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
+                <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Municipio / Ciudad *</label><input type="text" value={formCampus.municipio} onChange={(e) => setFormCampus({...formCampus, municipio: e.target.value.toUpperCase()})} placeholder="EJ: CARTAGENA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
               </div>
               <div className="flex justify-end mt-5 gap-3">
-                {formCampus.id && <button type="button" onClick={() => setFormCampus({ id: null, nombre: '', municipio: '' })} className="px-6 py-2.5 bg-gray-200 text-gray-700 font-bold text-sm rounded-lg hover:bg-gray-300">Cancelar</button>}
-                <button type="submit" className="bg-[#1B2631] hover:bg-gray-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow">{formCampus.id ? 'Actualizar' : 'Guardar'}</button>
+                {formCampus.id && <button type="button" onClick={() => setFormCampus({ id: null, nombre: '', municipio: '' })} className="px-6 py-2.5 bg-gray-200 text-gray-700 font-bold text-sm rounded-lg hover:bg-gray-300">CANCELAR</button>}
+                <button type="submit" className="bg-[#1B2631] hover:bg-gray-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow">{formCampus.id ? 'ACTUALIZAR' : 'GUARDAR'}</button>
               </div>
             </form>
             <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4">ID</th><th className="p-4">Nombre del Campus</th><th className="p-4">Municipio/Ciudad</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto">
                 {campus.filter(c => c.nombre.includes(busqueda.toUpperCase())).map((c) => (<tr key={c.id} className="hover:bg-gray-50"><td className="p-4 font-bold text-gray-500">{c.id}</td><td className="p-4 font-black text-[#1B2631]">{c.nombre}</td><td className="p-4 font-medium">{c.municipio}</td><td className="p-4 text-center flex justify-center gap-3"><button onClick={() => {setFormCampus(c); window.scrollTo(0,0);}} className="text-[#1B2631] hover:text-[#EBB700] font-bold text-xs uppercase tracking-tighter">Editar</button><button onClick={() => eliminarCampusReal(c.id)} className="text-red-700 hover:text-red-900 font-bold text-xs uppercase tracking-tighter">Eliminar</button></td></tr>))}
-                {campus.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No hay campus.</td></tr>}
+                {campus.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No hay registros almacenados.</td></tr>}
             </tbody></table>
           </div>
         )}
@@ -222,9 +222,9 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
         {pestañaActual === 'facultades' && (
           <div>
             <form onSubmit={guardarOActualizarFacultad} className={`bg-gray-50 p-6 rounded-xl border border-gray-200 border-t-4 mb-8 shadow-sm transition-colors duration-300 ${formFacultad.id ? 'border-t-[#EBB700] bg-amber-50/30' : 'border-t-[#EBB700]'}`}>
-              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formFacultad.id ? 'Editar Facultad' : 'Registrar Nueva Facultad'}</h4></div>
+              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formFacultad.id ? 'EDITAR FACULTAD' : 'REGISTRAR NUEVA FACULTAD'}</h4></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div className="w-full"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre de la Facultad *</label><input type="text" value={formFacultad.nombre} onChange={(e) => setFormFacultad({...formFacultad, nombre: e.target.value})} placeholder="Ej: INGENIERÍA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
+                <div className="w-full"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre de la Facultad *</label><input type="text" value={formFacultad.nombre} onChange={(e) => setFormFacultad({...formFacultad, nombre: e.target.value.toUpperCase()})} placeholder="EJ: INGENIERÍA" className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
                 <div className="w-full"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Campus de Pertenencia *</label>
                   <select value={formFacultad.campus} onChange={(e) => setFormFacultad({...formFacultad, campus: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required>
                     <option value="">Seleccione Campus...</option>
@@ -233,13 +233,13 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
                 </div>
               </div>
               <div className="flex justify-end mt-5 gap-3">
-                {formFacultad.id && <button type="button" onClick={() => setFormFacultad({ id: null, nombre: '', campus: '' })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg hover:bg-gray-300 w-full md:w-auto">Cancelar</button>}
-                <button type="submit" className="bg-[#1B2631] hover:bg-gray-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow w-full md:w-auto">{formFacultad.id ? 'Actualizar' : 'Guardar'}</button>
+                {formFacultad.id && <button type="button" onClick={() => setFormFacultad({ id: null, nombre: '', campus: '' })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg hover:bg-gray-300 w-full md:w-auto">CANCELAR</button>}
+                <button type="submit" className="bg-[#1B2631] hover:bg-gray-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow w-full md:w-auto">{formFacultad.id ? 'ACTUALIZAR' : 'GUARDAR'}</button>
               </div>
             </form>
             <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4">Facultad</th><th className="p-4">Campus Asignado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto">
                 {facultades.filter(f => f.nombre.includes(busqueda.toUpperCase())).map((f) => (<tr key={f.id} className="hover:bg-gray-50"><td className="p-4 font-black text-[#1B2631]">{f.nombre}</td><td className="p-4 font-bold text-gray-500">{f.campus || 'NO ASIGNADO'}</td><td className="p-4 text-center flex justify-center gap-3"><button onClick={() => {setFormFacultad(f); window.scrollTo(0,0);}} className="text-[#1B2631] font-bold text-xs uppercase">Editar</button><button onClick={() => eliminarFacultadReal(f.id)} className="text-red-700 font-bold text-xs uppercase">Eliminar</button></td></tr>))}
-                {facultades.length === 0 && <tr><td colSpan="3" className="p-8 text-center text-gray-500">No hay facultades registradas.</td></tr>}
+                {facultades.length === 0 && <tr><td colSpan="3" className="p-8 text-center text-gray-500">No hay registros almacenados.</td></tr>}
             </tbody></table>
           </div>
         )}
@@ -248,11 +248,11 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
         {pestañaActual === 'programas' && (
           <div>
             <form onSubmit={guardarOActualizarPrograma} className={`bg-gray-50 p-6 rounded-xl border border-gray-200 border-t-4 mb-8 shadow-sm transition-colors duration-300 ${formPrograma.id ? 'border-t-[#EBB700] bg-amber-50/30' : 'border-t-[#EBB700]'}`}>
-              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formPrograma.id ? 'Editar Programa' : 'Registrar Nuevo Programa'}</h4></div>
-              {facultades.length === 0 || campus.length === 0 ? (<div className="bg-red-50 text-red-600 p-4 rounded-lg font-bold text-sm">⚠ Atención: Registre Facultad y Campus primero.</div>) : (
+              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formPrograma.id ? 'EDITAR PROGRAMA' : 'REGISTRAR NUEVO PROGRAMA'}</h4></div>
+              {facultades.length === 0 || campus.length === 0 ? (<div className="bg-gray-100 text-gray-600 p-4 rounded-lg font-bold text-sm">[ATENCIÓN] Registre Facultad y Campus primero.</div>) : (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end mb-5">
-                    <div className="md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre Oficial del Programa *</label><input type="text" value={formPrograma.nombre} onChange={(e) => setFormPrograma({...formPrograma, nombre: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
+                    <div className="md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre Oficial del Programa *</label><input type="text" value={formPrograma.nombre} onChange={(e) => setFormPrograma({...formPrograma, nombre: e.target.value.toUpperCase()})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
                     
                     <div className="md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Facultad *</label>
                     <select value={formPrograma.facultad} onChange={(e) => {
@@ -273,14 +273,14 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
                     <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Campus (Auto)</label><input type="text" value={formPrograma.campus} className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-100 font-bold" readOnly /></div>
-                    <div className="md:col-span-2 flex justify-end gap-3">{formPrograma.id && <button type="button" onClick={() => setFormPrograma({ id: null, nombre: '', facultad: '', campus: '', modalidad: '' })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg">Cancelar</button>}<button type="submit" className="bg-[#1B2631] text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-gray-800">{formPrograma.id ? 'Actualizar' : 'Guardar'}</button></div>
+                    <div className="md:col-span-2 flex justify-end gap-3">{formPrograma.id && <button type="button" onClick={() => setFormPrograma({ id: null, nombre: '', facultad: '', campus: '', modalidad: '' })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg">CANCELAR</button>}<button type="submit" className="bg-[#1B2631] text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-gray-800">{formPrograma.id ? 'ACTUALIZAR' : 'GUARDAR'}</button></div>
                   </div>
                 </>
               )}
             </form>
             <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4">Programa Académico</th><th className="p-4">Facultad</th><th className="p-4">Campus</th><th className="p-4">Modalidad</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto pr-2">
                 {programas.filter(p => p.nombre.includes(busqueda.toUpperCase())).map((p) => (<tr key={p.id} className="hover:bg-gray-50"><td className="p-4 font-black text-[#1B2631]">{p.nombre}</td><td className="p-4 font-semibold text-gray-600">{p.facultad}</td><td className="p-4 text-gray-600 text-xs">{p.campus}</td><td className="p-4 text-gray-600 text-xs font-bold">{p.modalidad || 'N/A'}</td><td className="p-4 text-center flex justify-center gap-3"><button onClick={() => {setFormPrograma({id: p.id, nombre: p.nombre, facultad: p.facultad, campus: p.campus, modalidad: p.modalidad || ''}); window.scrollTo(0,0);}} className="text-[#1B2631] font-bold text-xs uppercase">Editar</button><button onClick={() => eliminarProgramaReal(p.id)} className="text-red-700 font-bold text-xs uppercase">Eliminar</button></td></tr>))}
-                {programas.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500">No hay programas registrados.</td></tr>}
+                {programas.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500">No hay registros almacenados.</td></tr>}
             </tbody></table>
           </div>
         )}
@@ -289,12 +289,12 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
         {pestañaActual === 'asignaturas' && (
           <div>
             <form onSubmit={guardarOActualizarAsignatura} className={`bg-gray-50 p-6 rounded-xl border border-gray-200 border-t-4 mb-8 shadow-sm transition-colors duration-300 ${formAsignatura.id ? 'border-t-[#EBB700] bg-amber-50/30' : 'border-t-[#EBB700]'}`}>
-              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formAsignatura.id ? 'Editar Asignatura' : 'Registrar Asignatura'}</h4></div>
-              {programas.length === 0 ? (<div className="bg-red-50 text-red-600 p-4 rounded-lg font-bold text-sm">⚠ registre Programas primero.</div>) : (
+              <div className="flex justify-between items-center mb-5"><h4 className="text-lg font-bold text-[#1B2631] uppercase tracking-wider">{formAsignatura.id ? 'EDITAR ASIGNATURA' : 'REGISTRAR ASIGNATURA'}</h4></div>
+              {programas.length === 0 ? (<div className="bg-gray-100 text-gray-600 p-4 rounded-lg font-bold text-sm">[ATENCIÓN] Registre programas primero.</div>) : (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
                     <div><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Código *</label><input type="number" value={formAsignatura.codigo} onChange={(e) => setFormAsignatura({...formAsignatura, codigo: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
-                    <div className="md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre Oficial *</label><input type="text" value={formAsignatura.nombre} onChange={(e) => setFormAsignatura({...formAsignatura, nombre: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
+                    <div className="md:col-span-2"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Nombre Oficial *</label><input type="text" value={formAsignatura.nombre} onChange={(e) => setFormAsignatura({...formAsignatura, nombre: e.target.value.toUpperCase()})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required /></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="md:col-span-1"><label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Facultad *</label><select value={formAsignatura.facultad} onChange={(e) => setFormAsignatura({...formAsignatura, facultad: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" required><option value="">Seleccionar...</option>{facultades.map(f => <option key={f.id} value={f.nombre}>{f.nombre}</option>)}</select></div>
@@ -307,13 +307,13 @@ const GestionAcademica = ({ usuarioActual = { rol: 'Administrador' } }) => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-end mt-6 pt-4 border-t gap-3">{formAsignatura.id && <button type="button" onClick={() => setFormAsignatura({ id: null, codigo: '', nombre: '', facultad: '', programasRelated: [] })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg">Cancelar</button>}<button type="submit" className="bg-[#1B2631] text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-gray-800">{formAsignatura.id ? 'Actualizar' : 'Guardar'}</button></div>
+                  <div className="flex justify-end mt-6 pt-4 border-t gap-3">{formAsignatura.id && <button type="button" onClick={() => setFormAsignatura({ id: null, codigo: '', nombre: '', facultad: '', programasRelated: [] })} className="px-6 py-2.5 bg-gray-200 font-bold text-sm rounded-lg">CANCELAR</button>}<button type="submit" className="bg-[#1B2631] text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-gray-800">{formAsignatura.id ? 'ACTUALIZAR' : 'GUARDAR'}</button></div>
                 </>
               )}
             </form>
             <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm relative z-0"><thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold"><tr><th className="p-4 w-20">Cód</th><th className="p-4">Asignatura</th><th className="p-4">Facultad</th><th className="p-4">Programas</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody className="text-sm divide-y bg-white overflow-y-auto">
                 {asignaturas.filter(a => a.nombre.includes(busqueda.toUpperCase()) || a.codigo.includes(busqueda)).map((m) => (<tr key={m.id} className="hover:bg-gray-50"><td className="p-4 font-bold text-gray-600">{m.codigo}</td><td className="p-4 font-black text-[#1B2631]">{m.nombre}</td><td className="p-4 font-semibold text-gray-600">{m.facultad}</td><td className="p-4 text-xs font-medium text-gray-500">{m.programas.join(', ')}</td><td className="p-4 text-center flex justify-center gap-3"><button onClick={() => {setFormAsignatura({id: m.id, codigo: m.codigo, nombre: m.nombre, facultad: m.facultad, programasRelated: m.programas}); window.scrollTo(0,0);}} className="text-[#1B2631] font-bold text-xs uppercase">Editar</button><button onClick={() => eliminarAsignaturaReal(m.id)} className="text-red-700 font-bold text-xs uppercase">Eliminar</button></td></tr>))}
-                {asignaturas.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500">No hay asignaturas registradas.</td></tr>}
+                {asignaturas.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500">No hay registros almacenados.</td></tr>}
             </tbody></table>
           </div>
         )}

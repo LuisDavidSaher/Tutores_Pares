@@ -17,7 +17,7 @@ public class Auditoria {
     private String detalle;          // Ej: "Se registró el campus ZARAGOCILLA"
     private String estado;           // Ej: "Éxito" o "Alerta"
 
-    // Este hechizo hace que Java ponga la hora exacta del servidor justo antes de guardar en la BD
+    // Este proceso hace que Java ponga la hora exacta del servidor justo antes de guardar en la BD
     @PrePersist
     protected void onCreate() {
         this.fechaHora = LocalDateTime.now();

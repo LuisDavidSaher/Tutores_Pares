@@ -30,7 +30,8 @@ public class TutoradoDetalle {
     private String notaFinal;
     private String promedioFinal; // El indicador clave que solicitó
     private String cargadoSire;
-
+    private String promAcumFinal;
+    
     @Column(length = 2000) // Permite textos largos para las observaciones
     private String observaciones;
 
@@ -97,4 +98,9 @@ public class TutoradoDetalle {
 
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
+
+
+    public String getPromAcumFinal() { return promAcumFinal; }
+    public void setPromAcumFinal(String promAcumFinal) { this.promAcumFinal = promAcumFinal;
+    }
 }

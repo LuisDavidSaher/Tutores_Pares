@@ -14,7 +14,7 @@ public class Programa {
     private String facultad;
     private String campus;
 
-    // 🔥 NUEVO CAMPO AGREGADO
+    // NUEVO CAMPO AGREGADO
     private String modalidad;
 
     public Programa() {}

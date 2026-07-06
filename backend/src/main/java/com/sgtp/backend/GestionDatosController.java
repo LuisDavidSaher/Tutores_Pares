@@ -14,70 +14,126 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class GestionDatosController {
 
-    @Autowired
-    private TutoriaRepository tutoriaRepository;
-
-    @Autowired
-    private TutoradoDetalleRepository tutoradoDetalleRepository;
-
-    // Agregamos el repositorio de estudiantes para cruzar los datos
-    @Autowired
-    private EstudianteRepository estudianteRepository;
+    @Autowired private ReporteRepository reporteRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
 
     @GetMapping("/tutores")
     public List<Map<String, Object>> obtenerTutores() {
-        List<Map<String, Object>> lista = new ArrayList<>();
-        List<Tutoria> tutorias = tutoriaRepository.findAll();
+        Map<String, Map<String, Object>> mapaTutores = new HashMap<>();
+        List<Reporte> reportes = reporteRepository.findAll();
 
-        for (Tutoria t : tutorias) {
-            if (t.getTutorDoc() != null && !t.getTutorDoc().isEmpty()) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", t.getId());
-                map.put("documento", t.getTutorDoc());
+        for (Reporte r : reportes) {
+            if (r.getTutorias() != null) {
+                for (Tutoria t : r.getTutorias()) {
+                    String doc = t.getTutorDoc();
 
-                // ⚔️ CRUCE DE DATOS: Buscamos al estudiante real usando su documento
-                Optional<Estudiante> estudianteOpt = estudianteRepository.findById(t.getTutorDoc());
+                    if (doc == null || doc.trim().isEmpty() || doc.equals("0") || doc.length() < 5) {
+                        continue;
+                    }
 
-                if (estudianteOpt.isPresent()) {
-                    Estudiante tutorReal = estudianteOpt.get();
-                    map.put("nombres", tutorReal.getNombres());
-                    map.put("apellidos", tutorReal.getApellidos());
-                    map.put("programa", tutorReal.getPrograma());
-                } else {
-                    // Si por algún motivo el estudiante fue borrado de la BD principal
-                    map.put("nombres", t.getTutorNombre());
-                    map.put("apellidos", "NO REGISTRADO");
-                    map.put("programa", "NO REGISTRADO");
+                    // MURO VISUAL: Ocultar registros sin nombre
+                    String nombreRevisado = t.getTutorNombre();
+                    if (nombreRevisado == null || nombreRevisado.trim().isEmpty() || nombreRevisado.length() < 3) {
+                        continue;
+                    }
+
+                    String per = r.getPeriodo();
+                    if (per == null || per.trim().isEmpty() || per.equals("6") || per.length() < 3) {
+                        continue;
+                    }
+
+                    if (mapaTutores.containsKey(doc)) {
+                        Map<String, Object> existente = mapaTutores.get(doc);
+
+                        String periodosExistentes = (String) existente.get("periodo");
+                        if (!periodosExistentes.contains(per)) {
+                            existente.put("periodo", periodosExistentes + ", " + per);
+                        }
+
+                        String asigExistentes = (String) existente.get("asignaturas");
+                        String nuevaAsig = t.getAsignatura();
+                        if (nuevaAsig != null && !nuevaAsig.isEmpty() && !asigExistentes.contains(nuevaAsig)) {
+                            existente.put("asignaturas", asigExistentes + ", " + nuevaAsig);
+                        }
+                    } else {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("id", t.getId());
+                        map.put("documento", doc);
+
+                        Optional<Estudiante> estOpt = estudianteRepository.findById(doc);
+                        if (estOpt.isPresent()) {
+                            Estudiante tutorReal = estOpt.get();
+                            map.put("nombres", tutorReal.getNombres());
+                            map.put("apellidos", tutorReal.getApellidos());
+                            map.put("programa", tutorReal.getPrograma());
+                        } else {
+                            map.put("nombres", nombreRevisado);
+                            map.put("apellidos", "");
+                            map.put("programa", r.getProgramaReporte());
+                        }
+
+                        map.put("periodo", per);
+                        map.put("asignaturas", t.getAsignatura() != null ? t.getAsignatura() : "NO REGISTRADA");
+                        map.put("estado", "ACTIVO");
+                        mapaTutores.put(doc, map);
+                    }
                 }
-
-                map.put("periodo", "2026-I");
-                map.put("asignaturas", t.getAsignatura());
-                map.put("estado", "ACTIVO");
-                lista.add(map);
             }
         }
-        return lista;
+        return new ArrayList<>(mapaTutores.values());
     }
 
     @GetMapping("/tutorados")
     public List<Map<String, Object>> obtenerTutorados() {
-        List<Map<String, Object>> lista = new ArrayList<>();
-        List<TutoradoDetalle> detalles = tutoradoDetalleRepository.findAll();
+        Map<String, Map<String, Object>> mapaTutorados = new HashMap<>();
+        List<Reporte> reportes = reporteRepository.findAll();
 
-        for (TutoradoDetalle d : detalles) {
-            if (d.getDocumento() != null && !d.getDocumento().isEmpty()) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", d.getIdBd());
-                map.put("documento", d.getDocumento());
-                map.put("nombres", d.getNombres());
-                map.put("apellidos", d.getApellidos());
-                map.put("programa", d.getPrograma());
-                map.put("periodo", "2026-I");
-                map.put("riesgo", d.getRiesgo());
-                map.put("promedio", d.getPromedioInicio());
-                lista.add(map);
+        for (Reporte r : reportes) {
+            if (r.getTutorias() != null) {
+                for (Tutoria t : r.getTutorias()) {
+                    if (t.getTutoradosList() != null) {
+                        for (TutoradoDetalle d : t.getTutoradosList()) {
+                            String doc = d.getDocumento();
+
+                            if (doc == null || doc.trim().isEmpty() || doc.equals("0") || doc.length() < 5) {
+                                continue;
+                            }
+
+                            // MURO VISUAL: Ocultar tutorados fantasma sin nombre
+                            String nombreRevisado = d.getNombres();
+                            if (nombreRevisado == null || nombreRevisado.trim().isEmpty()) {
+                                continue;
+                            }
+
+                            String per = r.getPeriodo();
+                            if (per == null || per.trim().isEmpty() || per.equals("6") || per.length() < 3) {
+                                continue;
+                            }
+
+                            if (mapaTutorados.containsKey(doc)) {
+                                Map<String, Object> existente = mapaTutorados.get(doc);
+
+                                String periodosExistentes = (String) existente.get("periodo");
+                                if (!periodosExistentes.contains(per)) {
+                                    existente.put("periodo", periodosExistentes + ", " + per);
+                                }
+                            } else {
+                                Map<String, Object> map = new HashMap<>();
+                                map.put("id", d.getIdBd() != null ? d.getIdBd() : System.currentTimeMillis() % 10000);
+                                map.put("documento", doc);
+                                map.put("nombres", nombreRevisado);
+                                map.put("apellidos", d.getApellidos());
+                                map.put("programa", d.getPrograma());
+                                map.put("periodo", per);
+                                map.put("riesgo", d.getRiesgo());
+                                map.put("promedio", d.getPromedioInicio());
+                                mapaTutorados.put(doc, map);
+                            }
+                        }
+                    }
+                }
             }
         }
-        return lista;
+        return new ArrayList<>(mapaTutorados.values());
     }
 }

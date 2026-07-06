@@ -31,7 +31,7 @@ public class CertificadoService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("No se encontró un proceso de tutoría finalizado y aprobado para esta cédula."));
 
-        // 🛡️ Si llegamos aquí, es porque el estudiante EXISTE y CUMPLIÓ.
+        // Si llegamos aquí, es porque el estudiante EXISTE y CUMPLIÓ.
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document();

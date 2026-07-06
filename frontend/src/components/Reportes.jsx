@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// --- SERVICIO DE AUDITORÍA ---
 const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxito") => {
   try {
     await fetch('http://localhost:8080/api/auditorias', {
@@ -13,7 +12,7 @@ const enviarAuditoria = async (usuario, modulo, accion, detalle, estado = "Éxit
   }
 };
 
-const limpiarTexto = (texto) => texto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z\s]/g, "");
+const limpiarTexto = (texto) => texto ? texto.toString().toUpperCase().trim() : "";
 
 const prevenirComa = (eventoTeclado) => {
   if (eventoTeclado.key === ',') eventoTeclado.preventDefault();
@@ -27,20 +26,21 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   const [filtroReportes, setFiltroReportes] = useState('');
   const [filtroTutorias, setFiltroTutorias] = useState('');
 
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 10;
+
   const emailReal = usuarioActual.email || (usuarioActual.rol === 'Administrador' ? 'admin.prueba@unicartagena.edu.co' : 'jefe.sistemas@unicartagena.edu.co');
-  const programaReal = usuarioActual.programa || 'Sistemas';
+  const programaReal = usuarioActual.programa ? usuarioActual.programa.toUpperCase() : 'SISTEMAS';
   
   const correoUsuario = usuarioActual.rol === 'Administrador' 
     ? `Administrador Global (${emailReal})` 
     : `Jefe de ${programaReal} (${emailReal})`;
 
-  // --- CATÁLOGOS ---
   const [catalogoFacultades, setCatalogoFacultades] = useState([]);
   const [catalogoCampus, setCatalogoCampus] = useState([]);
   const [catalogoProgramas, setCatalogoProgramas] = useState([]);
   const [catalogoAsignaturas, setCatalogoAsignaturas] = useState([]);
 
-  // --- ESTADOS: FASE 1 (CREACIÓN) ---
   const [formAsignatura, setFormAsignatura] = useState('');
   const [formPeriodo, setFormPeriodo] = useState('2026-I'); 
   
@@ -59,7 +59,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     codigo: '', campus: '', correo: '', riesgo: '', promedioInicio: '', bloqueado: false, tipoDoc: 'CC'
   });
 
-  // --- ESTADOS: FASE 2 (REPORTE FINAL) ---
   const [reporteACompletar, setReporteACompletar] = useState(null);
   const [filtroTutorFase2, setFiltroTutorFase2] = useState('');
   const [tutoriasExpandidasFase2, setTutoriasExpandidasFase2] = useState([]);
@@ -68,15 +67,15 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   const [tutoradoEnEdicion, setTutoradoEnEdicion] = useState(null); 
   const [datosEdicion, setDatosEdicion] = useState({});
 
-
-  // CONEXIÓN A SPRING BOOT (CATÁLOGOS Y REPORTES)
   const cargarDatosDesdeAPI = async () => {
     try {
+      const paramPrograma = usuarioActual.rol === 'Administrador' ? 'MULTI-PROGRAMA (ADMIN)' : programaReal;
+
       const [resCampus, resFacultades, resProgramas, resAsignaturas, resReportes] = await Promise.all([
         fetch('http://localhost:8080/api/campus'),
         fetch('http://localhost:8080/api/facultades'),
         fetch('http://localhost:8080/api/programas'),
-        fetch(`http://localhost:8080/api/asignaturas?programa=${encodeURIComponent(usuarioActual.rol === 'Administrador' ? 'MULTI-PROGRAMA (ADMIN)' : usuarioActual.programa)}`),
+        fetch(`http://localhost:8080/api/asignaturas?programa=${encodeURIComponent(paramPrograma)}`),
         fetch('http://localhost:8080/api/reportes') 
       ]);
 
@@ -106,10 +105,13 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarDatosDesdeAPI(); 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [filtroReportes]);
 
   const volverAListado = () => { setVistaActual('pantalla1'); setFiltroReportes(''); cargarDatosDesdeAPI(); };
   const irAPantalla2 = () => { cargarDatosDesdeAPI(); setVistaActual('pantalla2'); setFiltroTutorias(''); };
@@ -160,7 +162,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setTutoriasBorrador(nuevasTutorias);
   };
 
-  // NUEVO: Eliminar una tutoría completa en la Pantalla 2
   const eliminarTutoriaBorrador = (tutoriaId) => {
     if (window.confirm("¿Está seguro de eliminar esta tutoría completa? Todos los tutorados asociados se perderán.")) {
       setTutoriasBorrador(tutoriasBorrador.filter(t => t.id !== tutoriaId));
@@ -168,7 +169,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     }
   };
 
-  // GESTIÓN DE ESTUDIANTES (TUTOR Y TUTORADO)
+  // 🛡️ AUTOCOMPLETADO INTELIGENTE DEL PROGRAMA
   const buscarTutor = async () => {
     if (!tutorDoc) { alert("Ingrese un documento para buscar."); return; }
     
@@ -181,14 +182,14 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       if (respuesta.ok) {
         const datosEncontrados = await respuesta.json();
         const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
-        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
+        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : programaReal;
         const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
         setTutorDatos(prev => ({ 
           ...prev, 
           ...datosEncontrados,
           facultad: facultadValida,
-          programa: programaValido,
+          programa: programaValido, // Inyección del programa auto-asignado si faltaba
           campus: campusValido
         })); 
         
@@ -196,7 +197,9 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
         else setTutorBloqueado(true);
       } else {
         setTutorBloqueado(false);
-        alert("Tutor Par no encontrado. Los campos se han habilitado para que ingrese sus datos por primera vez.");
+        // Si no se encuentra, se pre-asigna el programa del jefe administrativo
+        setTutorDatos(prev => ({ ...prev, programa: programaReal }));
+        alert("Tutor Par no encontrado en la Base de Datos. Se han habilitado los campos con su programa pre-asignado.");
       }
     } catch (error) {
       console.error("Error buscando en la BD:", error);
@@ -244,18 +247,20 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       if (respuesta.ok) {
         const datosEncontrados = await respuesta.json();
         const facultadValida = catalogoFacultades.includes(datosEncontrados.facultad) ? datosEncontrados.facultad : '';
-        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : '';
+        const programaValido = catalogoProgramas.includes(datosEncontrados.programa) ? datosEncontrados.programa : programaReal;
         const campusValido = catalogoCampus.includes(datosEncontrados.campus) ? datosEncontrados.campus : '';
 
         setTutoradoDraft(prev => ({ 
           ...prev, 
           ...datosEncontrados,
-          facultad: facultadValida, programa: programaValido, campus: campusValido,
+          facultad: facultadValida, 
+          programa: programaValido, // Inyección dinámica
+          campus: campusValido,
           bloqueado: (facultadValida && programaValido && campusValido) ? true : false
         }));
       } else {
-        setTutoradoDraft(prev => ({ ...prev, bloqueado: false }));
-        alert("Tutorado no encontrado. Llene los datos para registrarlo.");
+        setTutoradoDraft(prev => ({ ...prev, bloqueado: false, programa: programaReal }));
+        alert("Tutorado no encontrado. Se ha pre-asignado el programa correspondiente.");
       }
     } catch (error) {
       console.error("Error buscando en la BD:", error);
@@ -294,14 +299,13 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
       return; 
     }
 
-    //  Evita agrupar si el usuario presionó Enter antes de agregar tutorados
     if (tutorados.length === 0) {
       alert("Error: Debe agregar al menos un tutorado a la lista antes de agrupar esta tutoría.");
       return;
     }
 
     if (!catalogoAsignaturas.includes(formAsignatura)) {
-      alert("Error: Debe seleccionar una asignatura válida del catálogo desplegable.");
+      alert("Error: Debe seleccionar una asignatura válida de la lista.");
       return;
     }
 
@@ -326,11 +330,10 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     setVistaActual('pantalla2');
   };
 
-  // GUARDAR REPORTE EN SPRING BOOT
   const guardarReporteInicial = async () => {
     if (tutoriasBorrador.length === 0) return;
 
-    const programaVinculado = usuarioActual.rol === 'Jefe de Departamento' ? usuarioActual.programa : 'MULTI-PROGRAMA (ADMIN)';
+    const programaVinculado = usuarioActual.rol === 'Jefe de Departamento' ? programaReal : 'MULTI-PROGRAMA (ADMIN)';
     
     const nuevoReporte = {
       id: `REP-TEMP`, 
@@ -361,7 +364,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
     }
   };
 
-  // MANEJO DE ESTADO PARA EVALUACIÓN FINAL
   const handleDictamenChange = (tutoriaId, valor) => {
     setReporteACompletar(prev => {
       if (!prev) return prev;
@@ -392,17 +394,37 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
   const procesarReporteFinal = async (e) => {
     e.preventDefault();
+
+    let hayErrores = false;
+    reporteACompletar.tutorias.forEach(tut => {
+      if (!tut.dictamen) hayErrores = true;
+      tut.tutoradosList.forEach(td => {
+        if (!td.fechaInicio || !td.fechaFin || !td.totalSesiones || !td.notaFinal || !td.promAcumFinal || !td.cargadoSire) {
+          hayErrores = true;
+        }
+      });
+    });
+
+    if (hayErrores) {
+      alert("⚠️ ACCIÓN DENEGADA: Faltan datos obligatorios. Expanda todas las tutorías y verifique los campos.");
+      return; 
+    }
+
     try {
-      const respuesta = await fetch(`http://localhost:8080/api/reportes/${reporteACompletar.id}/estado`, {
+      const reporteActualizado = { ...reporteACompletar, estado: 'Final' };
+      
+      const respuesta = await fetch(`http://localhost:8080/api/reportes/${reporteACompletar.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'Final' })
+        body: JSON.stringify(reporteActualizado)
       });
 
       if (respuesta.ok) {
-        alert("Reporte Finalizado y actualizado en la Base de Datos.");
+        alert("Reporte y datos de tutorados finalizados y actualizados exitosamente.");
         enviarAuditoria(correoUsuario, "REPORTES", "EDICIÓN", `Cerró con éxito el Reporte Final ${reporteACompletar.id}`);
         volverAListado();
+      } else {
+        alert("Ocurrió un error en el servidor al intentar guardar el reporte completo.");
       }
     } catch (error) {
       console.error(error);
@@ -412,7 +434,12 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
   const reportesFiltrados = listaReportes
     .filter(r => r.id.toLowerCase().includes(filtroReportes.toLowerCase()) || r.periodo.toLowerCase().includes(filtroReportes.toLowerCase()))
-    .filter(r => usuarioActual.rol === 'Administrador' ? true : r.programaReporte === usuarioActual.programa);
+    .filter(r => usuarioActual.rol === 'Administrador' ? true : r.programaReporte.toUpperCase() === programaReal);
+
+  const totalPaginasRep = Math.ceil(reportesFiltrados.length / itemsPorPagina) || 1;
+  const indUltimo = paginaActual * itemsPorPagina;
+  const indPrimer = indUltimo - itemsPorPagina;
+  const reportesActuales = reportesFiltrados.slice(indPrimer, indUltimo);
 
   const tutoriasFiltradas = tutoriasBorrador.filter(t => t.tutorNombre.toLowerCase().includes(filtroTutorias.toLowerCase()) || t.asignatura.toLowerCase().includes(filtroTutorias.toLowerCase()) || t.id.toLowerCase().includes(filtroTutorias.toLowerCase()));
 
@@ -424,7 +451,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
         <div>
           <h2 className="text-xl font-bold tracking-wide">Gestión de Reportes (SGTP)</h2>
           <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">
-            {usuarioActual.rol === 'Jefe de Departamento' ? `Programa: ${usuarioActual.programa}` : 'Panel de Administración Global'}
+            {usuarioActual.rol === 'Jefe de Departamento' ? `Programa: ${programaReal}` : 'Panel de Administración Global'}
           </p>
         </div>
         {vistaActual !== 'pantalla1' && (
@@ -437,8 +464,7 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
 
       <div className="p-8">
         
-        {/*   PANTALLA 1: LISTADO DE REPORTES */}
-
+        {/* PANTALLA 1: LISTADO DE REPORTES CON PAGINACIÓN */}
         {vistaActual === 'pantalla1' && (
           <div className="animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-100 pb-6 gap-4">
@@ -451,32 +477,43 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
               </button>
             </div>
 
-            <table className="w-full text-left border-collapse border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold">
-                <tr><th className="p-4">Reporte No.</th><th className="p-4">Programa</th><th className="p-4">Periodo Académico</th><th className="p-4 text-center">Tutorías Agrupadas</th><th className="p-4 text-center">Estado</th><th className="p-4 text-center">Acciones</th></tr>
-              </thead>
-              <tbody className="text-sm divide-y">
-                {reportesFiltrados.map((rep) => (
-                  <tr key={rep.id} className="hover:bg-gray-50">
-                    <td className="p-4 font-semibold text-[#1B2631]">{rep.id}</td>
-                    <td className="p-4 font-semibold text-gray-600 text-xs">{rep.programaReporte}</td>
-                    <td className="p-4 font-medium text-gray-600">{rep.periodo}</td>
-                    <td className="p-4 text-center font-bold text-blue-600">{rep.tutorias ? rep.tutorias.length : 0}</td>
-                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${rep.estado === 'Final' ? 'bg-gray-200 text-gray-700 border border-gray-300' : 'bg-green-50 text-green-700 border border-green-200'}`}>{rep.estado}</span></td>
-                    <td className="p-4 flex justify-center items-center gap-2">
-                      {rep.estado === 'Inicial' ? (
-                          <button onClick={() => iniciarFase2(rep)} className="px-4 py-1.5 rounded border text-xs font-bold bg-white text-[#1B2631] border-gray-300 hover:bg-gray-100 transition-all shadow-sm">
-                            Cerrar (Pasar a Final)
-                          </button>
-                      ) : (
-                          <span className="text-gray-500 font-semibold text-xs italic px-2">Completado</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {reportesFiltrados.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-gray-500">No se encontraron reportes reales en BD.</td></tr>}
-              </tbody>
-            </table>
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-[#1B2631] text-white text-xs uppercase font-semibold">
+                  <tr><th className="p-4">Reporte No.</th><th className="p-4">Programa</th><th className="p-4">Periodo Académico</th><th className="p-4 text-center">Tutorías Agrupadas</th><th className="p-4 text-center">Estado</th><th className="p-4 text-center">Acciones</th></tr>
+                </thead>
+                <tbody className="text-sm divide-y bg-white">
+                  {reportesActuales.map((rep) => (
+                    <tr key={rep.id} className="hover:bg-gray-50">
+                      <td className="p-4 font-semibold text-[#1B2631]">{rep.id}</td>
+                      <td className="p-4 font-semibold text-gray-600 text-xs">{rep.programaReporte}</td>
+                      <td className="p-4 font-medium text-gray-600">{rep.periodo}</td>
+                      <td className="p-4 text-center font-bold text-blue-600">{rep.tutorias ? rep.tutorias.length : 0}</td>
+                      <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${rep.estado === 'Final' ? 'bg-gray-200 text-gray-700 border border-gray-300' : 'bg-green-50 text-green-700 border border-green-200'}`}>{rep.estado}</span></td>
+                      <td className="p-4 flex justify-center items-center gap-2">
+                        {rep.estado === 'Inicial' ? (
+                            <button onClick={() => iniciarFase2(rep)} className="px-4 py-1.5 rounded border text-xs font-bold bg-white text-[#1B2631] border-gray-300 hover:bg-gray-100 transition-all shadow-sm">Cerrar (Pasar a Final)</button>
+                        ) : (<span className="text-gray-500 font-semibold text-xs italic px-2">Completado</span>)}
+                      </td>
+                    </tr>
+                  ))}
+                  {reportesActuales.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-gray-500">No se encontraron reportes reales en BD.</td></tr>}
+                </tbody>
+              </table>
+              {/* PAGINACIÓN DE REPORTES */}
+              {reportesFiltrados.length > 0 && (
+                <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                    Mostrando {indPrimer + 1} - {Math.min(indUltimo, reportesFiltrados.length)} de {reportesFiltrados.length} registros
+                  </span>
+                  <div className="flex space-x-2">
+                    <button onClick={() => setPaginaActual(p => Math.max(1, p - 1))} disabled={paginaActual === 1} className="px-4 py-2 border border-gray-300 rounded-md text-xs font-bold text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-50">ANTERIOR</button>
+                    <span className="px-4 py-2 text-xs font-bold text-gray-700">Pág. {paginaActual} / {totalPaginasRep}</span>
+                    <button onClick={() => setPaginaActual(p => Math.min(totalPaginasRep, p + 1))} disabled={paginaActual === totalPaginasRep} className="px-4 py-2 border border-gray-300 rounded-md text-xs font-bold text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-50">SIGUIENTE</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -609,20 +646,17 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
             <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Asignatura (Búsqueda Inteligente)</label>
-                  <input 
-                    type="text" 
-                    list="asignaturas-list"
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Asignatura</label>
+                  <select 
                     value={formAsignatura} 
                     onChange={(e) => setFormAsignatura(e.target.value)} 
-                    placeholder="Escriba para buscar o seleccione..."
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg font-medium outline-none bg-white text-sm focus:border-[#1B2631] focus:ring-1 focus:ring-[#1B2631]" 
                     required 
-                    disabled={tutorConfirmado} 
-                  />
-                  <datalist id="asignaturas-list">
-                    {catalogoAsignaturas.map(a => <option key={a} value={a} />)}
-                  </datalist>
+                    disabled={tutorConfirmado}
+                  >
+                    <option value="">Seleccione una asignatura...</option>
+                    {catalogoAsignaturas.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Periodo Académico Actual</label>
@@ -753,7 +787,6 @@ const Reportes = ({ usuarioActual = { rol: 'Jefe de Departamento', programa: 'IN
                  .map((tutoria) => (
                  <div key={tutoria.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-[#1B2631] mb-3">
                     
-                    {/* ACORDEÓN COMPACTO Y DELGADO */}
                     <div className="flex flex-col md:flex-row justify-between items-center gap-3">
                        <div className="flex-1 cursor-pointer w-full" onClick={() => toggleExpandirTutoriaFase2(tutoria.id)}>
                           <div className="flex items-center gap-2">

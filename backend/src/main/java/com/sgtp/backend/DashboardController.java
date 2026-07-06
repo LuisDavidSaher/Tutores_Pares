@@ -5,7 +5,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -16,30 +15,22 @@ public class DashboardController {
     @Autowired private AsignaturaRepository asignaturaRepository;
     @Autowired private ReporteRepository reporteRepository;
 
-    // Repositorios mantenidos por compatibilidad, aunque ahora todo se lee desde los Reportes
-    @Autowired private TutoradoDetalleRepository tutoradoRepository;
-    @Autowired private TutoriaRepository tutoriaRepository;
-
     @GetMapping("/metricas")
     public Map<String, Object> obtenerMetricas(@RequestParam(required = false) String programa) {
         Map<String, Object> metricas = new HashMap<>();
 
-        // 1. MÉTRICAS GENERALES DE CATÁLOGO
         metricas.put("programas", programaRepository.count());
         metricas.put("asignaturas", asignaturaRepository.count());
 
-        // 2. OBTENER Y FILTRAR REPORTES (El corazón del sistema)
         List<Reporte> todosLosReportes = reporteRepository.findAll();
         List<Reporte> reportesFiltrados = todosLosReportes;
 
-        // Si hay un programa específico (Jefe de Departamento), filtramos
         if (programa != null && !programa.isEmpty() && !programa.equals("MULTI-PROGRAMA (ADMIN)")) {
             reportesFiltrados = todosLosReportes.stream()
                     .filter(r -> programa.equals(r.getProgramaReporte()))
                     .toList();
         }
 
-        // 3. PROCESAMIENTO MATEMÁTICO DE DATOS REALES
         long tutores = 0;
         long tutorados = 0;
         long riesgoAlto = 0;
@@ -61,16 +52,19 @@ public class DashboardController {
             if (r.getTutorias() != null) {
                 tutores += tutoresEnEsteReporte;
                 for (Tutoria t : r.getTutorias()) {
-                    // Contabilizar Asignaturas
                     String asig = t.getAsignatura();
                     conteoAsignaturas.put(asig, conteoAsignaturas.getOrDefault(asig, 0L) + 1);
 
-                    // Contabilizar Tutorados y Riesgos
                     if (t.getTutoradosList() != null) {
                         tutorados += t.getTutoradosList().size();
                         for (TutoradoDetalle td : t.getTutoradosList()) {
-                            if ("ALTO".equals(td.getRiesgo())) riesgoAlto++;
-                            if ("BAJO".equals(td.getRiesgo())) riesgoBajo++;
+                            //  NUEVO ALGORITMO DE RIESGO: Detecta repitencias, condicionales y riesgo alto
+                            String riesgoStr = td.getRiesgo() != null ? td.getRiesgo().toUpperCase() : "";
+                            if (riesgoStr.contains("ALTO") || riesgoStr.contains("CONDICIONAL") || riesgoStr.contains("REPETIC")) {
+                                riesgoAlto++;
+                            } else if (!riesgoStr.isEmpty()) {
+                                riesgoBajo++;
+                            }
                         }
                     }
                 }
@@ -84,28 +78,13 @@ public class DashboardController {
         metricas.put("reportesCompletados", completados);
         metricas.put("reportesPendientes", pendientes);
 
-        // 4. TOP PROGRAMAS Y ASIGNATURAS 
         List<Map<String, Object>> topProgramas = conteoProgramas.entrySet().stream()
-                .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue()))
-                .limit(5)
-                .map(e -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("nombre", e.getKey());
-                    map.put("cantidad", e.getValue());
-                    return map;
-                })
-                .toList();
+                .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue())).limit(10)
+                .map(e -> { Map<String, Object> map = new HashMap<>(); map.put("nombre", e.getKey()); map.put("cantidad", e.getValue()); return map; }).toList();
 
         List<Map<String, Object>> topAsignaturas = conteoAsignaturas.entrySet().stream()
-                .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue()))
-                .limit(5)
-                .map(e -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("nombre", e.getKey());
-                    map.put("cantidad", e.getValue());
-                    return map;
-                })
-                .toList();
+                .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue())).limit(10)
+                .map(e -> { Map<String, Object> map = new HashMap<>(); map.put("nombre", e.getKey()); map.put("cantidad", e.getValue()); return map; }).toList();
 
         metricas.put("topProgramas", topProgramas);
         metricas.put("topAsignaturas", topAsignaturas);
