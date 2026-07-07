@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 const Auditorias = () => {
   const [registrosAuditoria, setRegistrosAuditoria] = useState([]);
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
-  // CONEXIÓN AL BACKEND PARA CARGAR LOS REGISTROS DE AUDITORÍA
-
+  // CONEXIÓN AL BACKEND PARA CARGAR LOS REGISTROS DE AUDITORÍA CON INTERCEPTOR JWT
   const cargarAuditorias = async () => {
     try {
-      const respuesta = await fetch('http://localhost:8080/api/auditorias');
+      const respuesta = await apiFetch('/api/auditorias');
       if (respuesta.ok) {
         const datos = await respuesta.json();
         setRegistrosAuditoria(datos);
@@ -21,7 +21,6 @@ const Auditorias = () => {
 
   useEffect(() => {
     const iniciarCarga = async () => { await cargarAuditorias(); };
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     iniciarCarga();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -45,22 +44,14 @@ const Auditorias = () => {
     return coincideTexto && coincideTipo;
   });
 
-  const exportarCSV = () => {
-    alert(" Exportando logs reales de la base de datos...");
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-7xl mx-auto pb-10 min-h-screen">
       
-      <div className="bg-[#1B2631] p-6 text-white border-b-4 border-[#EBB700] rounded-t-xl flex justify-between items-center">
+      <div className="bg-udc-primary p-6 text-white border-b-4 border-udc-secondary rounded-t-xl flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black tracking-wide">Registro de Auditoría y Trazabilidad</h2>
             <p className="text-sm text-gray-400 mt-1 uppercase tracking-widest">Monitoreo de actividades del sistema en tiempo real</p>
           </div>
-          <button onClick={exportarCSV} className="bg-gray-100/10 hover:bg-gray-100/20 text-white border border-gray-500 px-5 py-2.5 rounded-lg font-bold text-sm transition flex items-center shadow-sm">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-             Exportar Log (.CSV)
-          </button>
       </div>
 
       <div className="p-8">
@@ -68,7 +59,7 @@ const Auditorias = () => {
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button 
               onClick={() => setFiltroTipo('Todos')}
-              className={`px-6 py-2 text-sm font-bold rounded-md transition-all ${filtroTipo === 'Todos' ? 'bg-[#1B2631] text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-6 py-2 text-sm font-bold rounded-md transition-all ${filtroTipo === 'Todos' ? 'bg-udc-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Todos los eventos
             </button>
@@ -87,14 +78,14 @@ const Auditorias = () => {
               placeholder="Buscar por usuario, detalle o acción..." 
               value={filtroTexto} 
               onChange={(e) => setFiltroTexto(e.target.value)} 
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#EBB700] bg-gray-50 focus:bg-white transition-all"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-udc-secondary bg-gray-50 focus:bg-white transition-all"
             />
           </div>
         </div>
 
         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-left border-collapse">
-                <thead className="bg-[#1B2631] text-white text-[10px] uppercase font-black tracking-widest">
+                <thead className="bg-udc-primary text-white text-[10px] uppercase font-black tracking-widest">
                     <tr>
                         <th className="p-4">Fecha y Hora</th>
                         <th className="p-4">Usuario</th>
@@ -109,11 +100,11 @@ const Auditorias = () => {
                               {formatearFecha(log.fechaHora)}
                             </td>
                             <td className="p-4">
-                              <p className="font-black text-[#1B2631]">{log.usuario}</p>
+                              <p className="font-black text-udc-primary">{log.usuario}</p>
                               <p className="text-[10px] text-gray-400 font-bold uppercase">{log.modulo}</p>
                             </td>
                             <td className="p-4 text-gray-700 font-medium">
-                              <span className="font-bold text-[#1B2631] block text-xs mb-1">{log.accion}</span>
+                              <span className="font-bold text-udc-primary block text-xs mb-1">{log.accion}</span>
                               {log.detalle}
                             </td>
                             <td className="p-4 text-center">

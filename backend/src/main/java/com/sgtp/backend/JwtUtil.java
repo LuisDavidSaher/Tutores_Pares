@@ -2,18 +2,28 @@ package com.sgtp.backend;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-    private final long EXPIRATION_TIME = 1000 * 60 * 60 * 8; // 8 horas
+    // Extrae la variable desde el application.properties o variables de entorno del servidor
+    @Value("${jwt.secret}")
+    private String secretKey;
+
+    // Tiempo de expiración del token (8 horas)
+    private final long EXPIRATION_TIME = 1000 * 60 * 60 * 8;
+
+    // Método seguro para generar la llave criptográfica basada en el texto externo
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String correo, String rol) {
         return Jwts.builder()
@@ -21,13 +31,13 @@ public class JwtUtil {
                 .claim("rol", rol)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(key)
+                .signWith(getSigningKey())
                 .compact();
     }
 
     public Claims extractClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

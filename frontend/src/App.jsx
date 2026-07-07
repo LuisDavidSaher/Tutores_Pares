@@ -9,7 +9,7 @@ function App() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mostrarPassword, setMostrarPassword] = useState(false); // Estado para el ojito
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [errorLogin, setErrorLogin] = useState('');
   const [estaCargando, setEstaCargando] = useState(false);
 
@@ -17,6 +17,7 @@ function App() {
   const [cargandoCertificado, setCargandoCertificado] = useState(false);
   const [mensajeCertificado, setMensajeCertificado] = useState({ tipo: '', texto: '' });
 
+  // SERVICIO DE AUTENTICACIÓN
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!email.endsWith('@unicartagena.edu.co')) {
@@ -39,6 +40,7 @@ function App() {
     }
   };
 
+  // SERVICIO DE DESCARGA PÚBLICA DE CERTIFICADOS
   const handleDescargarCertificado = async (e) => {
     e.preventDefault();
     if (!cedulaCertificado) return;
@@ -65,7 +67,7 @@ function App() {
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
 
-      setMensajeCertificado({ tipo: 'exito', texto: '¡Certificado descargado con éxito!' });
+      setMensajeCertificado({ tipo: 'exito', texto: 'Certificado descargado con éxito.' });
       setCedulaCertificado('');
 
     } catch (error) {
@@ -79,7 +81,7 @@ function App() {
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#1B2631]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-udc-primary"></div>
       </div>
     );
   }
@@ -91,7 +93,7 @@ function App() {
   return (
     <div className="flex h-screen w-full bg-gray-50 font-sans">
       
-      {/* Mitad Izquierda: 60% */}
+      {/* PANEL VISUAL IZQUIERDO */}
       <div className="hidden lg:flex w-[60%] relative flex-col justify-center items-center">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgImage})` }}>
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
@@ -104,29 +106,29 @@ function App() {
         </div>
       </div>
 
-      {/* Mitad Derecha: Formulario 40% */}
+      {/* PANEL DE FORMULARIOS DERECHO */}
       <div className="w-full lg:w-[40%] flex flex-col items-center justify-center bg-white px-10 xl:px-16 relative overflow-y-auto">
         
         {estaCargando && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center z-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-[#EBB700] mb-3"></div>
-            <p className="text-sm font-bold text-[#1B2631] animate-pulse">Verificando credenciales...</p>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-udc-secondary mb-3"></div>
+            <p className="text-sm font-bold text-udc-primary animate-pulse">Verificando credenciales...</p>
           </div>
         )}
 
         <div className="w-full max-w-md mt-10">
-          <h2 className="text-3xl font-black text-[#1B2631] mb-2 tracking-tight">Bienvenido de nuevo</h2>
-          <p className="text-gray-500 mb-8 text-sm">Inicie sesión en su cuenta administrativa</p>
+          <h2 className="text-3xl font-black text-udc-primary mb-2 tracking-tight">Inicio de Sesión</h2>
+          <p className="text-gray-500 mb-8 text-sm">Acceso exclusivo para personal administrativo</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Correo electrónico</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Correo electrónico institucional</label>
               <input 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
-                placeholder="correo@unicartagena.edu.co"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-[#1B2631] focus:ring-1 focus:ring-[#1B2631] outline-none transition-all text-sm bg-gray-50 focus:bg-white" 
+                placeholder="usuario@unicartagena.edu.co"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-udc-primary focus:ring-1 focus:ring-udc-primary outline-none transition-all text-sm bg-gray-50 focus:bg-white" 
                 required 
               />
             </div>
@@ -140,7 +142,7 @@ function App() {
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 placeholder="••••••"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-[#1B2631] focus:ring-1 focus:ring-[#1B2631] outline-none transition-all text-sm bg-gray-50 focus:bg-white pr-12" 
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-udc-primary focus:ring-1 focus:ring-udc-primary outline-none transition-all text-sm bg-gray-50 focus:bg-white pr-12" 
                 required 
               />
               <button 
@@ -166,13 +168,13 @@ function App() {
             <button 
               type="submit" 
               disabled={estaCargando} 
-              className={`w-full text-white py-3 rounded-lg font-bold tracking-wide transition-colors mt-4 ${estaCargando ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1B2631] hover:bg-gray-800 shadow-md'}`}
+              className={`w-full text-white py-3 rounded-lg font-bold tracking-wide transition-colors mt-4 ${estaCargando ? 'bg-gray-400 cursor-not-allowed' : 'bg-udc-primary hover:bg-gray-800 shadow-md'}`}
             >
               INICIAR SESIÓN
             </button>
           </form>
 
-          {/* Línea divisoria */}
+          {/* SEPARADOR ZONA PÚBLICA */}
           <div className="mt-10 mb-8 relative">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
             <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
@@ -180,10 +182,10 @@ function App() {
             </div>
           </div>
 
-          {/* Bloque Descarga de Certificados */}
-          <div className="bg-gray-50 border border-gray-200 border-t-4 border-t-[#EBB700] p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-bold text-[#1B2631] mb-1">Descarga tu Certificado</h3>
-            <p className="text-xs text-gray-500 mb-4 leading-relaxed">Si fuiste Tutor Par y culminaste el proceso exitosamente, ingresa tu documento.</p>
+          {/* MÓDULO DE DESCARGA DE CERTIFICADOS */}
+          <div className="bg-gray-50 border border-gray-200 border-t-4 border-t-udc-secondary p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="font-bold text-udc-primary mb-1">Descarga de Certificado</h3>
+            <p className="text-xs text-gray-500 mb-4 leading-relaxed">Ingrese su número de documento para descargar el certificado de participación.</p>
             
             <div className="flex gap-2">
               <input 
@@ -191,13 +193,13 @@ function App() {
                 value={cedulaCertificado}
                 onChange={(e) => setCedulaCertificado(e.target.value)}
                 placeholder="No. de Documento" 
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm outline-none focus:border-[#EBB700] bg-white"
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm outline-none focus:border-udc-secondary bg-white"
                 disabled={cargandoCertificado}
               />
               <button 
                 onClick={handleDescargarCertificado}
                 disabled={cargandoCertificado || !cedulaCertificado}
-                className={`px-4 py-2.5 rounded-lg font-bold text-sm shadow-sm transition-colors whitespace-nowrap ${cargandoCertificado || !cedulaCertificado ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#EBB700] text-[#1B2631] hover:bg-yellow-500'}`}
+                className={`px-4 py-2.5 rounded-lg font-bold text-sm shadow-sm transition-colors whitespace-nowrap ${cargandoCertificado || !cedulaCertificado ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-udc-secondary text-udc-primary hover:bg-yellow-500'}`}
               >
                 {cargandoCertificado ? 'Buscando...' : 'Descargar'}
               </button>
@@ -213,7 +215,7 @@ function App() {
         </div>
 
         <div className="absolute bottom-6 text-center w-full px-10">
-          <p className="text-[10px] text-gray-400 font-medium">© 2026 Universidad de Cartagena. Todos los derechos reservados.</p>
+          <p className="text-[10px] text-gray-400 font-medium">© {new Date().getFullYear()} Universidad de Cartagena. Todos los derechos reservados.</p>
           <p className="text-[10px] text-gray-400 font-medium mt-0.5">Sistema de Gestión de Tutoría entre Pares (SGTP)</p>
         </div>
       </div>

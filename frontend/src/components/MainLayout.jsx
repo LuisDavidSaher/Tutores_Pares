@@ -3,7 +3,7 @@ import { AuthContext } from '../AuthContext';
 import logoCorto from '../assets/Logo_Corto.png';
 import logoUdc from '../assets/Logo_Completo.png';
 
-// Importación de todos los módulos de la aplicación
+// Importación de módulos
 import Inicio from './Inicio.jsx';
 import GestionUsuarios from './GestionUsuarios.jsx';
 import GestionDatos from './GestionDatos.jsx';
@@ -12,16 +12,26 @@ import Reportes from './Reportes.jsx';
 import Dashboard from './Dashboard.jsx';
 import Auditorias from './Auditorias.jsx';
 
+// Cálculo dinámico del Periodo Académico
+const obtenerPeriodoAcademicoActual = () => {
+  const fecha = new Date();
+  const año = fecha.getFullYear();
+  const mes = fecha.getMonth(); // 0 = Enero, 11 = Diciembre
+  const periodo = mes < 6 ? 'I' : 'II';
+  return `${año}-${periodo}`;
+};
+
 const MainLayout = () => {
   const { user, logout } = useContext(AuthContext);
   const [activeMenu, setActiveMenu] = useState('Inicio');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // --- LÓGICA DE CONTROL DE ACCESO (RBAC) ---
+  const periodoActual = obtenerPeriodoAcademicoActual();
+
+  // Control de Acceso Basado en Roles (RBAC)
   let menuOptions = [];
 
   if (user?.role === 'Administrador') {
-    // El Administrador ve toda la aplicación sin restricciones
     menuOptions = [
       'Inicio',
       'Gestión de Usuarios',
@@ -32,7 +42,6 @@ const MainLayout = () => {
       'Auditorías'
     ];
   } else {
-    // El Jefe de Departamento tiene visión restringida
     menuOptions = [
       'Inicio',
       'Reportes',
@@ -43,15 +52,15 @@ const MainLayout = () => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       
-      {/* --- BARRA LATERAL (SIDEBAR) --- */}
-      <aside className={`bg-[#1B2631] text-white flex flex-col justify-between shadow-2xl transition-all duration-300 shrink-0 ${isSidebarOpen ? 'w-72' : 'w-20'}`}>
+      {/* BARRA LATERAL (SIDEBAR) */}
+      <aside className={`bg-udc-primary text-white flex flex-col justify-between shadow-2xl transition-all duration-300 shrink-0 ${isSidebarOpen ? 'w-72' : 'w-20'}`}>
         <div>
           <div className={`p-6 flex items-center border-b border-gray-700 transition-all ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <img src={logoCorto} alt="Logo Corto UDC" className="w-12 h-12 object-contain shrink-0" />
             {isSidebarOpen && (
               <div className="ml-3 overflow-hidden whitespace-nowrap">
                 <h2 className="font-bold text-sm tracking-wide text-white">GESTOR DE TUTORES</h2>
-                <p className="text-xs text-[#EBB700]">Univ. de Cartagena</p>
+                <p className="text-xs text-udc-secondary">Univ. de Cartagena</p>
               </div>
             )}
           </div>
@@ -66,11 +75,11 @@ const MainLayout = () => {
                   isSidebarOpen ? 'px-4 w-full' : 'justify-center w-full'
                 } ${
                   activeMenu === option 
-                    ? 'bg-white/10 text-[#EBB700] border-l-4 border-[#EBB700]' 
+                    ? 'bg-white/10 text-udc-secondary border-l-4 border-udc-secondary' 
                     : 'text-gray-300 hover:bg-white/5 hover:text-white border-l-4 border-transparent'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${activeMenu === option ? 'bg-[#EBB700]' : 'bg-gray-500'} ${isSidebarOpen ? 'mr-3' : ''}`}></span>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${activeMenu === option ? 'bg-udc-secondary' : 'bg-gray-500'} ${isSidebarOpen ? 'mr-3' : ''}`}></span>
                 {isSidebarOpen && <span className="whitespace-nowrap overflow-hidden">{option}</span>}
               </button>
             ))}
@@ -79,9 +88,12 @@ const MainLayout = () => {
 
         <div className={`p-4 border-t border-gray-700 bg-black/20 flex ${isSidebarOpen ? 'justify-between items-center' : 'flex-col justify-center space-y-4'}`}>
           <div className={`flex items-center overflow-hidden ${isSidebarOpen ? 'space-x-3' : 'justify-center'}`}>
-            <div className="w-10 h-10 rounded-full bg-[#EBB700] text-[#1B2631] flex items-center justify-center font-bold text-lg shrink-0">
+            
+            {/* AVATAR CORREGIDO */}
+            <div className="w-10 h-10 rounded-full bg-udc-secondary text-udc-primary flex items-center justify-center font-bold text-lg shrink-0">
               {user?.name?.charAt(0) || 'U'}
             </div>
+            
             {isSidebarOpen && (
               <div className="truncate">
                 <p className="text-sm font-semibold truncate">{user?.name}</p>
@@ -102,7 +114,7 @@ const MainLayout = () => {
         </div>
       </aside>
 
-      {/* --- ÁREA DE CONTENIDO PRINCIPAL --- */}
+      {/* ÁREA DE CONTENIDO PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto bg-gray-50 relative">
         
         <header className="bg-white px-8 py-5 border-b border-gray-200 shadow-sm flex items-center justify-between sticky top-0 z-20">
@@ -119,26 +131,24 @@ const MainLayout = () => {
           </div>
           
           <div className="text-sm text-gray-500 hidden sm:block">
-            Periodo Académico: <span className="font-bold text-[#1B2631]">2026-I</span>
+            Periodo Académico: <span className="font-bold text-udc-primary">{periodoActual}</span>
           </div>
         </header>
 
-        {/* Contenedor dinámico de vistas con Seguridad de Rutas */}
+        {/* CONTENEDOR DINÁMICO DE VISTAS */}
         <div className="p-8 flex-1">
           {activeMenu === 'Inicio' && <Inicio setActiveMenu={setActiveMenu} />}
           
-          {/* Rutas Restringidas (Solo Administrador) */}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Usuarios' && <GestionUsuarios />}
           {user?.role === 'Administrador' && activeMenu === 'Gestión de Datos' && <GestionDatos />}
           {user?.role === 'Administrador' && activeMenu === 'Auditorías' && <Auditorias />}
           
-          {/* Rutas Compartidas (Admin y Jefe) */}
           {activeMenu === 'Gestión Académica' && <GestionAcademica usuarioActual={{ rol: user?.role, programa: user?.programa }} />}
           {activeMenu === 'Dashboard Estadísticas' && <Dashboard />}
           {activeMenu === 'Reportes' && <Reportes usuarioActual={{ rol: user?.role, programa: user?.programa }} />}
         </div>
 
-        {/* --- FOOTER GLOBAL --- */}
+        {/* FOOTER GLOBAL */}
         <footer className="bg-white border-t border-gray-200 mt-auto w-full">
           <div className="max-w-7xl mx-auto p-8 lg:px-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-8">
@@ -152,14 +162,14 @@ const MainLayout = () => {
               <div>
                 <h3 className="font-bold text-gray-800 mb-4 text-sm">Enlaces Rápidos</h3>
                 <ul className="text-gray-500 text-sm space-y-2 mb-6">
-                  <li><a href="https://www.unicartagena.edu.co/" target="_blank" rel="noopener noreferrer" className="hover:text-[#1B2631] transition-colors">Portal Universidad de Cartagena</a></li>
-                  <li><a href="#" className="hover:text-[#1B2631] transition-colors">Guía de Uso del Aplicativo</a></li>
+                  <li><a href="https://www.unicartagena.edu.co/" target="_blank" rel="noopener noreferrer" className="hover:text-udc-primary transition-colors">Portal Universidad de Cartagena</a></li>
+                  <li><a href="#" className="hover:text-udc-primary transition-colors"></a></li>
                 </ul>
               </div>
               
               <div>
                 <h3 className="font-bold text-gray-800 mb-4 text-sm">Contacto y Soporte</h3>
-                <ul className="text-[#EBB700] text-sm space-y-2 font-medium">
+                <ul className="text-udc-secondary text-sm space-y-2 font-medium">
                   <li><a href="mailto:soporte@unicartagena.edu.co" className="hover:underline hover:text-yellow-600 transition-colors">soporte@unicartagena.edu.co</a></li>
                   <li><a href="mailto:bienestar@unicartagena.edu.co" className="hover:underline hover:text-yellow-600 transition-colors">bienestar@unicartagena.edu.co</a></li>
                 </ul>
@@ -169,7 +179,7 @@ const MainLayout = () => {
             
             <div className="pt-6 border-t border-gray-200 flex flex-col xl:flex-row justify-between items-center text-xs text-gray-500 space-y-4 xl:space-y-0">
               <div className="text-center xl:text-left">
-                <p>© 2026 Universidad de Cartagena. Todos los Derechos Reservados - NIT: 890480123-5</p>
+                <p>© {new Date().getFullYear()} Universidad de Cartagena. Todos los Derechos Reservados - NIT: 890480123-5</p>
                 <p className="mt-1">Institución de Educación Superior sujeta a inspección y vigilancia por el MEN</p>
               </div>
             </div>

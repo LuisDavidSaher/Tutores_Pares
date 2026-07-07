@@ -7,13 +7,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- REVISIÓN DE SESIÓN LOCAL  ---
+  // --- REVISIÓN DE SESIÓN LOCAL ---
   useEffect(() => {
     const checkSession = async () => {
-      // Leemos si hay una sesión guardada en la memoria del navegador
       const sessionGuardada = localStorage.getItem('sgtp_session');
-      if (sessionGuardada) {
-        setUser(JSON.parse(sessionGuardada));
+      const tokenGuardado = localStorage.getItem('sgtp_token'); // Rescatamos el Token JWT
+
+      if (sessionGuardada && tokenGuardado) {
+        const userData = JSON.parse(sessionGuardada);
+        userData.token = tokenGuardado; // Reinyectamos el token en memoria
+        setUser(userData);
       }
       setLoading(false);
     };
@@ -21,10 +24,9 @@ export const AuthProvider = ({ children }) => {
     checkSession();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- LOGIN CONECTADO A SPRING BOOT ---
+  // --- LOGIN CONECTADO A SPRING BOOT (JWT) ---
   const login = async (email, password) => {
     try {
-      // Apuntamos al AuthController.java que creamos en Spring Boot
       const response = await fetch('http://localhost:8080/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -32,26 +34,34 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (!response.ok) {
-        const errorMsg = await response.text();
-        throw new Error(errorMsg || "Credenciales incorrectas o usuario no registrado.");
+        // Leemos el JSON de error que configuramos en AuthController.java
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.mensaje || "Credenciales incorrectas o usuario no registrado.");
       }
 
-      // Si las credenciales son correctas, Java nos devuelve los datos
       const data = await response.json();
 
       const nombreFormateado = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-      // Armamos el objeto de sesión exactamente como lo esperaba el resto de su App
+      // Armamos el objeto de sesión incluyendo el Token JWT
       const userData = {
         name: nombreFormateado,
         email: email,
-        role: data.rol, // Mapeamos "rol" de Java a "role" en React
-        programa: data.programa || null 
+        role: data.rol,
+        programa: data.programa || null,
+        token: data.token // CAPTURA DEL TOKEN CRIPTOGRÁFICO
       };
 
-      // Guardamos en estado y en el navegador para que no se cierre al recargar
       setUser(userData);
-      localStorage.setItem('sgtp_session', JSON.stringify(userData));
+      
+      // Persistencia en el navegador (Separamos datos públicos del token de seguridad)
+      localStorage.setItem('sgtp_session', JSON.stringify({
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        programa: userData.programa
+      }));
+      localStorage.setItem('sgtp_token', data.token); 
 
       return { success: true };
 
@@ -64,8 +74,8 @@ export const AuthProvider = ({ children }) => {
   // --- LOGOUT LOCAL ---
   const logout = async () => {
     setLoading(true);
-    // Eliminamos la sesión de la memoria del navegador
     localStorage.removeItem('sgtp_session');
+    localStorage.removeItem('sgtp_token'); // DESTRUCCIÓN DEL TOKEN JWT
     setUser(null);
     setLoading(false);
   };

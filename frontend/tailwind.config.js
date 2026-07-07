@@ -2,10 +2,16 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}", // Esto de acá a abajo es para incluir los archivos .js, .ts, .jsx y .tsx en el archivo tailwind.config.js
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        // Colores Institucionales de la Universidad de Cartagena
+        'udc-primary': '#1B2631',   // Azul Profundo
+        'udc-secondary': '#EBB700', // Dorado
+      }
+    },
   },
   plugins: [],
 }
