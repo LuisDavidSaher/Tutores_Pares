@@ -14,7 +14,7 @@ public class AsignaturaController {
     @Autowired
     private AsignaturaService service;
 
-    // MODIFICADO PARA LA TAREA 3.1: Filtro inteligente
+    // Filtro inteligente
     @GetMapping
     public List<Asignatura> listar(@RequestParam(required = false) String programa) {
         List<Asignatura> todas = service.obtenerTodas();
